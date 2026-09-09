@@ -1,0 +1,3 @@
+import { NextResponse } from "next/server";
+import { query } from "@/lib/db";
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) { const { id } = await params; const collegeId = Number(id); if (!Number.isInteger(collegeId)) return NextResponse.json({error:"Invalid college."},{status:400}); try { const result = await query<{id:number;name:string;code:string}>("SELECT b.id,b.name,b.code FROM college_branches cb JOIN branches b ON b.id=cb.branch_id WHERE cb.college_id=$1 ORDER BY b.name",[collegeId]); return NextResponse.json({ branches:result.rows }); } catch { return NextResponse.json({error:"Unable to load branches."},{status:503}); } }

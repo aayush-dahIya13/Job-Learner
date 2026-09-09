@@ -1,0 +1,7 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { currentUserId } from "@/lib/auth";
+import { query } from "@/lib/db";
+const schema = z.object({ jobRoleId: z.coerce.number().int().positive("Please select a valid job role.") });
+export async function GET() { const userId = await currentUserId(); if (!userId) return NextResponse.json({ error: "Please sign in again." }, { status: 401 }); const result = await query<{ id: number; title: string }>("SELECT jr.id::integer AS id, jr.title FROM student_career_goals scg JOIN job_roles jr ON jr.id=scg.job_role_id WHERE scg.user_id=$1", [userId]); return NextResponse.json({ jobRole: result.rows[0] ?? null }); }
+export async function PUT(request: Request) { const userId = await currentUserId(); if (!userId) return NextResponse.json({ error: "Please sign in again." }, { status: 401 }); const parsed = schema.safeParse(await request.json()); if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 }); const exists = await query("SELECT 1 FROM job_roles WHERE id=$1", [parsed.data.jobRoleId]); if (!exists.rowCount) return NextResponse.json({ error: "That job role does not exist." }, { status: 400 }); await query("INSERT INTO student_career_goals(user_id,job_role_id) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET job_role_id=EXCLUDED.job_role_id, created_at=NOW()", [userId, parsed.data.jobRoleId]); return NextResponse.json({ ok: true }); }

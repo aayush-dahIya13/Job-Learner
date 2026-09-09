@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>neither</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-typescript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-rust.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-go.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sidebar-resizer"></div>
+  <div class="sidebar-header">
+    <div class="app-logo">neither<span>.canvas</span></div>
+    <button class="sidebar-toggle" id="sidebar-close-btn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+  </div>
+  <div class="sidebar-actions">
+    <button class="btn-new-page" id="new-page-btn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New Canvas
+    </button>
+    <div style="display:flex;gap:6px;margin-top:7px;">
+      <button class="btn-io" id="export-btn" title="Save all canvases to a file">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export
+      </button>
+      <label class="btn-io" id="import-lbl" title="Load canvases from a file">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Import
+        <input type="file" id="import-file" accept=".neither,.json" style="display:none">
+      </label>
+    </div>
+  </div>
+  <div class="sidebar-tabs">
+    <div class="sidebar-tab active" data-tab="pages">📋 Pages</div>
+    <div class="sidebar-tab" data-tab="history">🗑 History</div>
+  </div>
+  <div class="pages-list active" id="pages-list"></div>
+  <div class="history-list" id="history-list"></div>
+</div>
+
+<div id="main">
+  <canvas id="grid-canvas"></canvas>
+  <div id="topbar">
+    <button id="sidebar-open-btn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+    <span id="page-title-display" class="page-title-display"></span>
+    <span id="canvas-date-badge" class="canvas-date-badge" style="display:none"></span>
+    <div class="toolbar">
+      <button class="tool-btn" id="connect-toggle">🔗 <span>Connect</span></button>
+      <button class="tool-btn" id="bg-toggle">🖼 <span>Background</span></button>
+      <button class="tool-btn" id="reset-view-btn">🏠 <span>Reset</span></button>
+    </div>
+    <div id="clock-widget">
+      <div id="clock-time">00:00:00</div>
+      <div id="clock-date">—</div>
+    </div>
+  </div>
+  <div id="connect-banner">🔗 Connect mode — click a source bubble, then click target(s) · ESC to exit</div>
+  <div id="canvas-wrap">
+    <div id="canvas-bg"></div>
+    <div id="canvas">
+      <svg id="connections-svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" class="conn-arrow"/></marker>
+        </defs>
+        <line id="temp-line" x1="0" y1="0" x2="0" y2="0"/>
+      </svg>
+    </div>
+    <div id="empty-state"><div class="big">🫧</div><p>Right-click anywhere to add a bubble<br>or double-click on empty space</p></div>
+    <div id="no-page"><div class="big">📋</div><p>No canvas selected</p><button id="no-page-btn">Create first canvas</button></div>
+  </div>
+  <div id="zoom-ind">100%</div>
+  <div id="hint">Right-click = new bubble · Double-click empty = text bubble · Drag = pan freely · Pinch/scroll = zoom</div>
+</div>
+
+<div id="ctx-menu">
+  <div class="ctx-lbl">Add bubble</div>
+  <div class="ctx-item" data-a="add-text">📝 Text note</div>
+  <div class="ctx-item" data-a="add-code">💻 Code snippet</div>
+  <div class="ctx-item" data-a="add-subcanvas">🗂 Canvas in bubble</div>
+  <div class="ctx-item" data-a="add-todo">✅ To-do list</div>
+  <div class="ctx-item" data-a="add-image">🖼 Image</div>
+  <div class="ctx-sep"></div>
+  <div id="ctx-bubble-sec" style="display:none">
+    <div class="ctx-lbl">This bubble</div>
+    <div class="ctx-item" data-a="connect">🔗 Connect to…</div>
+    <div class="ctx-item danger" data-a="delete-bubble">🗑 Delete bubble / system</div>
+    <div class="ctx-lbl">Color</div>
+    <div class="color-row">
+      <div class="cswatch" style="background:#d9a5a0" data-c="yellow"></div>
+      <div class="cswatch" style="background:#e29662" data-c="orange"></div>
+      <div class="cswatch" style="background:#e0726a" data-c="red"></div>
+      <div class="cswatch" style="background:#8fbf8a" data-c="green"></div>
+      <div class="cswatch" style="background:#7ba8c9" data-c="blue"></div>
+      <div class="cswatch" style="background:#1f1820;border:1.5px solid #332732" data-c=""></div>
+    </div>
+    <div class="ctx-sep"></div>
+  </div>
+</div>
+
+<!-- SIDEBAR BACKGROUND RIGHT-CLICK MENU -->
+<div id="sidebar-ctx-menu">
+  <div class="ctx-lbl">Sidebar</div>
+  <div class="ctx-item" data-sba="hide">👁 Hide sidebar</div>
+  <div class="ctx-item" data-sba="expand-all">▼ Expand all pages</div>
+  <div class="ctx-item" data-sba="collapse-all">▶ Collapse all pages</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-lbl">View</div>
+  <div class="ctx-item" data-sba="reset-width">↔ Reset sidebar width</div>
+  <div class="ctx-item" data-sba="background">🖼 Canvas background…</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-lbl">Data</div>
+  <div class="ctx-item" data-sba="export">⬇ Export all canvases</div>
+  <div class="ctx-item" data-sba="import">⬆ Import canvases</div>
+</div>
+
+<!-- PAGE ITEM RIGHT-CLICK MENU -->
+<div id="page-ctx-menu">
+  <div class="ctx-item" data-pa="open">📂 Open</div>
+  <div class="ctx-item" data-pa="rename">✏️ Rename</div>
+  <div class="ctx-item" data-pa="addsub">➕ Add sub-page</div>
+  <div class="ctx-item" id="page-ctx-promote" data-pa="promote" style="display:none;">⬆ Move to top level</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item danger" data-pa="del">🗑 Delete</div>
+</div>
+
+<div id="del-modal">
+  <div class="del-box">
+    <h3>Delete options</h3>
+    <p>This bubble has connections. What would you like to delete?</p>
+    <div class="del-btns">
+      <button class="del-btn cancel" id="del-cancel">Cancel</button>
+      <button class="del-btn bo" id="del-bubble-only">Bubble only</button>
+      <button class="del-btn sys" id="del-system">Whole system</button>
+    </div>
+  </div>
+</div>
+
+<div id="fmt-toolbar">
+  <select class="fmt-sel" id="fmt-size" title="Style">
+    <option value="">Normal</option>
+    <option value="h1">Heading 1</option>
+    <option value="h2">Heading 2</option>
+    <option value="h3">Heading 3</option>
+    <option value="sm">Small text</option>
+  </select>
+  <div class="fmt-sep"></div>
+  <button class="fmt-btn" data-cmd="bold" title="Bold"><b>B</b></button>
+  <button class="fmt-btn" data-cmd="italic" title="Italic"><i>I</i></button>
+  <button class="fmt-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+  <button class="fmt-btn" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+  <div class="fmt-sep"></div>
+  <button class="fmt-btn" data-cmd="subscript" title="Subscript">x<sub>2</sub></button>
+  <button class="fmt-btn" data-cmd="superscript" title="Superscript">x<sup>2</sup></button>
+  <div class="fmt-sep"></div>
+  <button class="fmt-btn" data-cmd="insertUnorderedList" title="Bullet list">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="4" cy="6" r="1.4" fill="currentColor"/><circle cx="4" cy="12" r="1.4" fill="currentColor"/><circle cx="4" cy="18" r="1.4" fill="currentColor"/><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/></svg>
+  </button>
+  <button class="fmt-btn" data-cmd="insertOrderedList" title="Numbered list">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><text x="0" y="9" font-size="7" fill="currentColor" stroke="none">1.</text><text x="0" y="16" font-size="7" fill="currentColor" stroke="none">2.</text><text x="0" y="23" font-size="7" fill="currentColor" stroke="none">3.</text><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/></svg>
+  </button>
+  <button class="fmt-btn" data-cmd="outdent" title="Decrease indent">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="18" x2="20" y2="18"/><path d="M7 9l-3 3 3 3"/></svg>
+  </button>
+  <button class="fmt-btn" data-cmd="indent" title="Increase indent">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="10" y1="18" x2="20" y2="18"/><path d="M4 9l3 3-3 3"/></svg>
+  </button>
+  <div class="fmt-sep"></div>
+  <button class="fmt-btn" data-align="left" title="Align left">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="17" y2="18"/></svg>
+  </button>
+  <button class="fmt-btn" data-align="center" title="Align center">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5.5" y1="18" x2="18.5" y2="18"/></svg>
+  </button>
+  <button class="fmt-btn" data-align="right" title="Align right">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="7" y1="18" x2="20" y2="18"/></svg>
+  </button>
+  <button class="fmt-btn" data-align="justify" title="Justify">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+  </button>
+  <div class="fmt-sep"></div>
+  <select class="fmt-sel" id="fmt-font" title="Font">
+    <option value="Inter,sans-serif">Inter</option>
+    <option value="DM Mono,monospace">Mono</option>
+    <option value="Syne,sans-serif">Syne</option>
+    <option value="Georgia,serif">Serif</option>
+  </select>
+  <div class="fmt-sep"></div>
+  <div class="fmt-color-group">
+    <span class="fmt-color-lbl" title="Text color">A</span>
+    <div class="fmt-color" style="background:#d9a5a0" data-col="#d9a5a0" title="Rose"></div>
+    <div class="fmt-color" style="background:#e29662" data-col="#e29662" title="Amber"></div>
+    <div class="fmt-color" style="background:#e0726a" data-col="#e0726a" title="Red"></div>
+    <div class="fmt-color" style="background:#8fbf8a" data-col="#8fbf8a" title="Green"></div>
+    <div class="fmt-color" style="background:#ede2de" data-col="#ede2de" title="Cream"></div>
+  </div>
+  <div class="fmt-sep"></div>
+  <div class="fmt-color-group">
+    <span class="fmt-color-lbl" title="Highlight">✎</span>
+    <div class="fmt-hl" style="background:#5a4a3a" data-col="#5a4a3a" title="Amber highlight"></div>
+    <div class="fmt-hl" style="background:#4a5a42" data-col="#4a5a42" title="Green highlight"></div>
+    <div class="fmt-hl" style="background:#4a4a5e" data-col="#4a4a5e" title="Blue highlight"></div>
+    <div class="fmt-hl" style="background:transparent;border:1px solid var(--sidebar-border)" data-col="transparent" title="No highlight"></div>
+  </div>
+  <div class="fmt-sep"></div>
+  <button class="fmt-btn" id="fmt-clear" title="Clear formatting">✕</button>
+</div>
+
+<!-- SUB-CANVAS MODAL -->
+<div id="subcanvas-modal">
+  <div class="sc-modal-box">
+    <div class="sc-modal-topbar">
+      <span>🗂</span>
+      <input class="sc-modal-title" id="sc-modal-title" value="Untitled canvas" />
+      <span class="sc-modal-hint">Right-click or dbl-click to add · Drag to pan</span>
+      <button class="tool-btn" id="sc-connect-toggle" style="pointer-events:all;font-size:10px;padding:4px 9px;">🔗 Connect</button>
+      <button class="sc-modal-close" id="sc-modal-close">✕ Close</button>
+    </div>
+    <div class="sc-canvas-wrap" id="sc-canvas-wrap">
+      <div class="sc-canvas" id="sc-canvas">
+        <svg class="sc-svg" id="sc-svg" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="sc-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#3a3520"/></marker>
+          </defs>
+          <line class="sc-temp-line" id="sc-temp-line" x1="0" y1="0" x2="0" y2="0"/>
+        </svg>
+      </div>
+      <div class="sc-empty" id="sc-empty">Right-click or double-click to add a bubble</div>
+      <div class="sc-zoom" id="sc-zoom">100%</div>
+      <div id="sc-connect-banner" style="position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(217,165,160,0.12);border:1px solid rgba(217,165,160,0.5);border-radius:20px;padding:5px 16px;font-size:11px;font-weight:700;color:var(--accent);pointer-events:none;display:none;white-space:nowrap;z-index:100;">🔗 Click source bubble</div>
+    </div>
+  </div>
+</div>
+
+<!-- SUB-CANVAS CONTEXT MENU -->
+<div id="sc-ctx-menu" style="position:fixed;background:var(--surface2);border:1px solid var(--sidebar-border);border-radius:11px;padding:6px;z-index:7000;min-width:185px;box-shadow:0 10px 36px rgba(0,0,0,0.55);display:none;">
+  <div class="ctx-lbl">Add bubble</div>
+  <div class="ctx-item" data-sca="add-text">📝 Text note</div>
+  <div class="ctx-item" data-sca="add-code">💻 Code snippet</div>
+  <div class="ctx-item" data-sca="add-subcanvas">🗂 Canvas in bubble</div>
+  <div class="ctx-item" data-sca="add-todo">✅ To-do list</div>
+  <div class="ctx-item" data-sca="add-image">🖼 Image</div>
+  <div class="ctx-sep" id="sc-ctx-bub-sep" style="display:none"></div>
+  <div id="sc-ctx-bub-sec" style="display:none">
+    <div class="ctx-lbl">This bubble</div>
+    <div class="ctx-item" data-sca="connect">🔗 Connect to…</div>
+    <div class="ctx-item danger" data-sca="delete-bubble">🗑 Delete bubble</div>
+    <div class="ctx-lbl">Color</div>
+    <div class="color-row">
+      <div class="cswatch" style="background:#d9a5a0" data-sc="yellow"></div>
+      <div class="cswatch" style="background:#e29662" data-sc="orange"></div>
+      <div class="cswatch" style="background:#e0726a" data-sc="red"></div>
+      <div class="cswatch" style="background:#8fbf8a" data-sc="green"></div>
+      <div class="cswatch" style="background:#7ba8c9" data-sc="blue"></div>
+      <div class="cswatch" style="background:#1f1820;border:1.5px solid #332732" data-sc=""></div>
+    </div>
+  </div>
+</div>
+
+<!-- GENERIC CONFIRM / ALERT MODAL — replaces native confirm()/alert() popups -->
+<div id="confirm-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--surface2);border:1px solid var(--sidebar-border);border-radius:16px;padding:26px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.7);">
+    <h3 id="confirm-modal-title" style="font-size:15px;font-weight:700;margin-bottom:8px;color:var(--text);">Confirm</h3>
+    <p id="confirm-modal-msg" style="font-size:13px;color:var(--text-dim);margin-bottom:20px;line-height:1.6;"></p>
+    <div id="confirm-modal-btns" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="confirm-modal-cancel" style="background:var(--surface);border:1px solid var(--sidebar-border);color:var(--text-dim);border-radius:9px;padding:9px 16px;font-family:var(--font-ui);font-size:12px;font-weight:700;cursor:pointer;">Cancel</button>
+      <button id="confirm-modal-ok" style="background:var(--accent);color:var(--bg);border:none;border-radius:9px;padding:9px 16px;font-family:var(--font-ui);font-size:12px;font-weight:700;cursor:pointer;">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div id="import-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--surface2);border:1px solid var(--sidebar-border);border-radius:16px;padding:28px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.7);">
+    <div style="font-size:22px;margin-bottom:10px;">📥</div>
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:8px;color:var(--text);">Import canvases</h3>
+    <p id="import-modal-desc" style="font-size:13px;color:var(--text-dim);margin-bottom:20px;line-height:1.6;"></p>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button id="import-merge-btn" style="background:var(--accent);color:var(--bg);border:none;border-radius:9px;padding:10px 14px;font-family:var(--font-ui);font-size:12px;font-weight:700;cursor:pointer;text-align:left;">
+        ➕ Merge — add to my existing canvases
+      </button>
+      <button id="import-replace-btn" style="background:var(--surface);border:1px solid var(--sidebar-border);color:var(--text-dim);border-radius:9px;padding:10px 14px;font-family:var(--font-ui);font-size:12px;font-weight:700;cursor:pointer;text-align:left;">
+        🔄 Replace — overwrite everything with this file
+      </button>
+      <button id="import-cancel-btn" style="background:none;border:none;color:var(--text-muted);font-family:var(--font-ui);font-size:11px;cursor:pointer;padding:6px;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- BACKGROUND PANEL -->
+<div id="bg-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9000;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--surface2);border:1px solid var(--sidebar-border);border-radius:16px;padding:26px;max-width:380px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.7);">
+    <div style="font-size:22px;margin-bottom:10px;">🖼</div>
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:4px;color:var(--text);">Canvas background</h3>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:18px;">Applies to this canvas only.</p>
+
+    <div id="bg-preview-wrap" style="display:none;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid var(--sidebar-border);">
+      <img id="bg-preview-img" style="width:100%;height:120px;object-fit:cover;display:block;">
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:8px;">Lofi presets</label>
+      <div id="bg-preset-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        <button class="bg-preset-swatch" data-preset="hills" title="Moonlit hills"><div class="bg-preset-fill"></div></button>
+        <button class="bg-preset-swatch" data-preset="rain" title="Rain window"><div class="bg-preset-fill"></div></button>
+        <button class="bg-preset-swatch" data-preset="plant" title="Quiet plant"><div class="bg-preset-fill"></div></button>
+        <button class="bg-preset-swatch" data-preset="dunes" title="Soft dunes"><div class="bg-preset-fill"></div></button>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+      <div style="flex:1;height:1px;background:var(--sidebar-border);"></div>
+      <span style="font-size:10px;color:var(--text-muted);">or</span>
+      <div style="flex:1;height:1px;background:var(--sidebar-border);"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <label class="btn-io" style="flex:1;cursor:pointer;">
+        📁 From device
+        <input type="file" id="bg-file-input" accept="image/*" style="display:none">
+      </label>
+      <button class="btn-io" id="bg-url-btn" style="flex:1;">🔗 From URL</button>
+    </div>
+
+    <div id="bg-url-row" style="display:none;gap:6px;margin-bottom:14px;">
+      <input type="text" id="bg-url-input" placeholder="Paste image URL…" style="flex:1;background:var(--surface);border:1px solid var(--sidebar-border);color:var(--text);border-radius:7px;padding:8px 10px;font-size:12px;font-family:var(--font-ui);outline:none;">
+      <button id="bg-url-apply" style="background:var(--accent);color:var(--bg);border:none;border-radius:7px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;">Add</button>
+    </div>
+
+    <div id="bg-opacity-row" style="display:none;margin-bottom:10px;">
+      <label style="font-size:11px;color:var(--text-dim);display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span>Opacity</span><span id="bg-opacity-val">60%</span>
+      </label>
+      <input type="range" id="bg-opacity-slider" min="0" max="100" value="60" style="width:100%;accent-color:var(--accent);">
+    </div>
+
+    <div id="bg-fit-row" style="display:none;margin-bottom:18px;">
+      <label style="font-size:11px;color:var(--text-dim);display:block;margin-bottom:6px;">Fit</label>
+      <div style="display:flex;gap:6px;">
+        <button class="bg-fit-opt" data-fit="cover">Cover</button>
+        <button class="bg-fit-opt" data-fit="contain">Contain</button>
+        <button class="bg-fit-opt" data-fit="repeat">Tile</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;">
+      <button id="bg-remove-btn" style="flex:1;background:var(--surface);border:1px solid var(--sidebar-border);color:var(--text-dim);border-radius:9px;padding:9px 12px;font-family:var(--font-ui);font-size:12px;font-weight:700;cursor:pointer;">🗑 Remove</button>
+      <button id="bg-close-btn" style="flex:1;background:var(--accent);color:var(--bg);border:none;border-radius:9px;padding:9px 12px;font-family:var(--font-ui);font-size:12px;font-weight:700;cursor:pointer;">Done</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

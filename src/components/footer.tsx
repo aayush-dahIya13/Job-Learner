@@ -1,0 +1,1 @@
+export function Footer() { return <footer className="border-t border-stone-200 bg-[#f4ecdf]"><div className="container-page flex flex-col gap-2 py-7 text-sm text-stone-600 sm:flex-row sm:justify-between"><p>© {new Date().getFullYear()} JOB-LEARNER.</p><p>Career clarity starts with the right foundation.</p></div></footer>; }
