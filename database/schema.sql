@@ -147,6 +147,16 @@ CREATE INDEX IF NOT EXISTS job_role_skills_skill_id_idx ON job_role_skills(skill
 CREATE INDEX IF NOT EXISTS student_skills_user_id_idx ON student_skills(user_id);
 CREATE INDEX IF NOT EXISTS student_skills_skill_id_idx ON student_skills(skill_id);
 
+-- Student-owned chronological progress notes for individual skills.
+CREATE TABLE IF NOT EXISTS student_skill_notes (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  note TEXT NOT NULL CHECK (char_length(btrim(note)) > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS student_skill_notes_user_skill_created_idx ON student_skill_notes(user_id, skill_id, created_at DESC);
+
 -- Stage 4: AI-generated, student-owned career guidance.  The deterministic
 -- readiness score remains calculated by application code and is recorded here
 -- only as a snapshot of the generation.

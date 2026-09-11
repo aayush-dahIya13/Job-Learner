@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">JOB-LEARNER JL monogram</title>
+  <desc id="desc">A refined copper J and botanical green L lettermark on a transparent background.</desc>
+  <!-- The J has a classical serif stem and a single, smooth lower hook. -->
+  <path fill="#ae7d60" d="M113 76h156v23h-28v183c0 75-43 121-117 121-62 0-105-35-105-88 0-35 22-63 58-63 26 0 45 18 45 42 0 18-12 32-29 36 12 26 40 39 68 39 44 0 67-31 67-87V99h-25V76zm57 0h42v226c0 48-15 76-46 89 24-19 32-49 32-91V99h-28V76z"/>
+  <!-- The L begins beside the J stem, leaving a deliberate air gap between forms. -->
+  <path fill="#6f8b65" d="M269 76h95v23h-27v266h67c34 0 55-18 69-57l21 7-18 88H269v-23h25V99h-25V76zm54 23h14v281h-14V99z"/>
+</svg>

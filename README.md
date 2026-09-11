@@ -2,7 +2,6 @@
 # Job-Learner
 =======
 # JOB-LEARNER
-
 JOB-LEARNER is a Smart India Hackathon student platform that lays the foundation for AI-powered career and learning guidance. Stage 1 delivers a polished landing page, student accounts, secure authentication, PostgreSQL persistence, profile editing, and a protected student dashboard.
 
 Stage 2 adds college-to-branch management, official curricula (semesters and subjects), a student curriculum view, and role-protected administration.
