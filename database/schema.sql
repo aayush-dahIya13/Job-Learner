@@ -73,7 +73,12 @@ CREATE TABLE IF NOT EXISTS curricula (
   branch_id BIGINT NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
   curriculum_name VARCHAR(255) NOT NULL,
   regulation_version VARCHAR(100) NOT NULL,
+  academic_year VARCHAR(30),
   description TEXT,
+  source_name VARCHAR(255),
+  source_url VARCHAR(2048),
+  last_verified_at TIMESTAMPTZ,
+  verification_status VARCHAR(20) NOT NULL DEFAULT 'unverified' CHECK (verification_status IN ('verified', 'demo', 'unverified')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT curricula_college_branch_version_key UNIQUE (college_id, branch_id, regulation_version)
@@ -97,6 +102,7 @@ CREATE TABLE IF NOT EXISTS subjects (
 );
 CREATE INDEX IF NOT EXISTS college_branches_college_id_idx ON college_branches(college_id);
 CREATE INDEX IF NOT EXISTS curricula_college_branch_idx ON curricula(college_id, branch_id);
+CREATE INDEX IF NOT EXISTS curricula_student_lookup_idx ON curricula(college_id, branch_id, updated_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS semesters_curriculum_id_idx ON semesters(curriculum_id);
 CREATE INDEX IF NOT EXISTS subjects_semester_id_idx ON subjects(semester_id);
 

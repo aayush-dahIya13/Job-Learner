@@ -80,8 +80,8 @@ JOIN job_roles r ON r.title = m.role_title
 JOIN skills s ON s.name = m.skill_name
 ON CONFLICT (job_role_id, skill_id) DO NOTHING;
 
-INSERT INTO curricula (college_id, branch_id, curriculum_name, regulation_version, description)
-SELECT c.id, b.id, 'Bachelor of Technology Curriculum', '2025', 'Sample curriculum for Stage 2 demonstration.' FROM colleges c JOIN branches b ON b.name = 'Computer Science Engineering' WHERE c.name IN ('Indian Institute of Technology Bombay', 'COEP Technological University')
+INSERT INTO curricula (college_id, branch_id, curriculum_name, regulation_version, description, source_name, verification_status)
+SELECT c.id, b.id, 'Bachelor of Technology Curriculum', '2025', 'Sample curriculum for Stage 2 demonstration.', 'JOB-LEARNER demo data', 'demo' FROM colleges c JOIN branches b ON b.name = 'Computer Science Engineering' WHERE c.name IN ('Indian Institute of Technology Bombay', 'COEP Technological University')
 ON CONFLICT DO NOTHING;
 INSERT INTO semesters (curriculum_id, semester_number)
 SELECT id, n FROM curricula CROSS JOIN (VALUES (1), (2)) AS numbers(n) WHERE regulation_version = '2025'
