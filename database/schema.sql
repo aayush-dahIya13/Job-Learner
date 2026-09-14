@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS subjects (
   semester_id BIGINT NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
   subject_code VARCHAR(40) NOT NULL,
   subject_name VARCHAR(255) NOT NULL,
-  credits NUMERIC(4,1) NOT NULL CHECK (credits > 0 AND credits <= 30),
+  credits NUMERIC(4,1) NOT NULL CHECK (credits >= 0 AND credits <= 30),
   description TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -181,8 +181,10 @@ CREATE TABLE IF NOT EXISTS roadmaps (
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   job_role_id BIGINT REFERENCES job_roles(id) ON DELETE SET NULL,
   readiness_score INTEGER NOT NULL CHECK (readiness_score BETWEEN 0 AND 100),
+  roadmap JSONB,
   generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE roadmaps ADD COLUMN IF NOT EXISTS roadmap JSONB;
 CREATE TABLE IF NOT EXISTS roadmap_items (
   id BIGSERIAL PRIMARY KEY,
   roadmap_id BIGINT NOT NULL REFERENCES roadmaps(id) ON DELETE CASCADE,
