@@ -1,3 +1,20 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
-export async function GET(_:Request,{params}:{params:Promise<{collegeId:string;branchId:string}>}) { const {collegeId,branchId}=await params; const c=Number(collegeId),b=Number(branchId); if(!Number.isInteger(c)||!Number.isInteger(b))return NextResponse.json({error:"Invalid request."},{status:400}); try {const r=await query<{id:number;curriculum_name:string;regulation_version:string;description:string}>("SELECT id,curriculum_name,regulation_version,description FROM curricula WHERE college_id=$1 AND branch_id=$2 ORDER BY id DESC LIMIT 1",[c,b]);const curriculum=r.rows[0];if(!curriculum)return NextResponse.json({curriculum:null,semesters:[]});const rows=await query<{semester_number:number;subject_id:number|null;subject_code:string|null;subject_name:string|null;credits:string|null;subject_description:string|null}>("SELECT se.semester_number,su.id AS subject_id,su.subject_code,su.subject_name,su.credits,su.description AS subject_description FROM semesters se LEFT JOIN subjects su ON su.semester_id=se.id WHERE se.curriculum_id=$1 ORDER BY se.semester_number,su.subject_code",[curriculum.id]);const map=new Map<number,{semesterNumber:number;subjects:unknown[]}>();for(const x of rows.rows){const semester=map.get(x.semester_number)??{semesterNumber:x.semester_number,subjects:[]};if(x.subject_id)semester.subjects.push({id:x.subject_id,code:x.subject_code,name:x.subject_name,credits:Number(x.credits),description:x.subject_description});map.set(x.semester_number,semester)}return NextResponse.json({curriculum:{...curriculum,regulationVersion:curriculum.regulation_version},semesters:[...map.values()]});}catch(e){console.error(e);return NextResponse.json({error:"Unable to load curriculum."},{status:503})} }
+import { currentUserId } from "@/lib/auth";
+import { getStudentCurriculum } from "@/lib/student-curriculum";
+
+// Compatibility endpoint. Supplied IDs are verified against the authenticated profile.
+export async function GET(_: Request, { params }: { params: Promise<{ collegeId: string; branchId: string }> }) {
+  const userId = await currentUserId();
+  if (!userId) return NextResponse.json({ error: "Please sign in again." }, { status: 401 });
+  const { collegeId, branchId } = await params;
+  const requestedCollegeId = Number(collegeId), requestedBranchId = Number(branchId);
+  if (!Number.isSafeInteger(requestedCollegeId) || !Number.isSafeInteger(requestedBranchId)) return NextResponse.json({ error: "Invalid curriculum request." }, { status: 400 });
+  try {
+    const curriculum = await getStudentCurriculum(userId);
+    if (curriculum.college?.id !== requestedCollegeId || curriculum.branch?.id !== requestedBranchId) return NextResponse.json({ error: "You can only view the curriculum for your own student profile." }, { status: 403 });
+    return NextResponse.json(curriculum);
+  } catch (error) {
+    console.error("Could not load student curriculum:", error);
+    return NextResponse.json({ error: "Unable to load your curriculum right now. Please try again." }, { status: 503 });
+  }
+}

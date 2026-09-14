@@ -1,4 +1,8 @@
 import { requireUserId } from "@/lib/auth";
-import { query } from "@/lib/db";
-import { CurriculumViewer } from "@/components/curriculum-viewer"; import { DashboardShell } from "@/components/layout/dashboard-shell";
-export default async function CurriculumPage(){const id=await requireUserId();const r=await query<{college_id:number;branch_id:number;college:string;branch:string}>("SELECT sp.college_id,sp.branch_id,c.name AS college,b.name AS branch FROM student_profiles sp JOIN colleges c ON c.id=sp.college_id JOIN branches b ON b.id=sp.branch_id WHERE sp.user_id=$1",[id]);const p=r.rows[0];if(!p)throw Error("Profile not found.");return <DashboardShell title="My Curriculum" description={`${p.college} · ${p.branch}`}><section className="surface mt-8 p-5 sm:p-6"><CurriculumViewer collegeId={p.college_id} branchId={p.branch_id}/></section></DashboardShell>}
+import { CurriculumViewer } from "@/components/curriculum-viewer";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
+
+export default async function CurriculumPage() {
+  await requireUserId();
+  return <DashboardShell title="My Curriculum" description="Your college, branch, and registered course structure."><section className="surface mt-8 p-5 sm:p-6"><CurriculumViewer /></section></DashboardShell>;
+}
