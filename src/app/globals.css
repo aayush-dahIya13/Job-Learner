@@ -116,7 +116,7 @@
   .theme-toggle-compact { @apply h-10 min-h-0 w-10 shrink-0 px-0; }
   .theme-toggle-compact .theme-toggle-label { display: none; }
   .dashboard-layout { @apply mx-auto flex min-h-screen max-w-[1600px]; }
-  .dashboard-sidebar { width: clamp(14.5rem, 19vw, 18.5rem); max-width: 25vw; transition: width .22s ease, padding .22s ease; }
+  .dashboard-sidebar { position: sticky; top: 0; align-self: flex-start; height: 100dvh; max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain; width: clamp(14.5rem, 19vw, 18.5rem); max-width: 25vw; transition: width .22s ease, padding .22s ease; }
   .dashboard-sidebar[data-collapsed="true"] { width: 6.5rem; min-width: 6.5rem; padding-left: 1rem; padding-right: 1rem; }
   .dashboard-sidebar[data-collapsed="true"] .sidebar-label, .dashboard-sidebar[data-collapsed="true"] .sidebar-brand-copy { display: none; }
   .dashboard-sidebar[data-collapsed="true"] .sidebar-brand { justify-content: center; padding-left: 0; padding-right: 0; }
@@ -133,7 +133,7 @@
   .sidebar-control { @apply grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2; background: var(--jl-surface); border-color: var(--jl-border); color: var(--jl-text-muted); }
   .sidebar-control:hover { background: var(--jl-surface-muted); color: var(--jl-primary); }
   .sidebar-control:focus-visible { --tw-ring-color: var(--jl-focus); }
-  .mobile-drawer { @apply fixed inset-y-0 left-0 z-50 w-[min(19rem,calc(100vw-3rem))] border-r p-5 shadow-2xl; background: var(--jl-ivory); border-color: var(--jl-border); transform: translateX(-105%); transition: transform .22s ease; }
+  .mobile-drawer { @apply fixed inset-y-0 left-0 z-50 w-[min(19rem,calc(100vw-3rem))] border-r p-5 shadow-2xl; background: var(--jl-ivory); border-color: var(--jl-border); transform: translateX(-105%); transition: transform .22s ease; overflow-y: auto; overscroll-behavior: contain; }
   .mobile-drawer[data-open="true"] { transform: translateX(0); }
   .mobile-drawer-backdrop { @apply fixed inset-0 z-40 bg-black/45; }
   .brand-logo { display: inline-flex; min-width: 0; align-items: center; gap: .8rem; color: var(--jl-text); }
