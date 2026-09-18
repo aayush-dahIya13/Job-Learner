@@ -205,3 +205,89 @@ CREATE TABLE IF NOT EXISTS roadmap_item_skills (
 CREATE INDEX IF NOT EXISTS roadmaps_user_generated_idx ON roadmaps(user_id, generated_at DESC);
 CREATE INDEX IF NOT EXISTS roadmap_items_roadmap_id_idx ON roadmap_items(roadmap_id);
 CREATE INDEX IF NOT EXISTS roadmap_item_skills_item_id_idx ON roadmap_item_skills(roadmap_item_id);
+
+-- Stage 6: Student Diagnostic Assessment Engine Schema
+CREATE TABLE IF NOT EXISTS assessments (
+  id BIGSERIAL PRIMARY KEY,
+  job_role_id BIGINT REFERENCES job_roles(id) ON DELETE SET NULL,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  assessment_type VARCHAR(50) NOT NULL DEFAULT 'diagnostic' CHECK (assessment_type IN ('diagnostic', 'topic', 'milestone', 'reassessment', 'company_screening')),
+  duration_minutes INTEGER NOT NULL DEFAULT 45 CHECK (duration_minutes > 0),
+  total_questions INTEGER NOT NULL DEFAULT 0,
+  passing_score INTEGER NOT NULL DEFAULT 70 CHECK (passing_score BETWEEN 0 AND 100),
+  version INTEGER NOT NULL DEFAULT 1,
+  status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'draft', 'archived')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS assessment_questions (
+  id BIGSERIAL PRIMARY KEY,
+  assessment_id BIGINT NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+  skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  question_type VARCHAR(30) NOT NULL DEFAULT 'mcq' CHECK (question_type IN ('mcq', 'multiple_select', 'code_output', 'debugging')),
+  question_text TEXT NOT NULL,
+  difficulty VARCHAR(20) NOT NULL DEFAULT 'intermediate' CHECK (difficulty IN ('beginner', 'intermediate', 'advanced')),
+  points INTEGER NOT NULL DEFAULT 1 CHECK (points > 0),
+  explanation TEXT,
+  metadata JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS assessment_question_options (
+  id BIGSERIAL PRIMARY KEY,
+  question_id BIGINT NOT NULL REFERENCES assessment_questions(id) ON DELETE CASCADE,
+  option_text TEXT NOT NULL,
+  option_order INTEGER NOT NULL DEFAULT 1,
+  is_correct BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS assessment_attempts (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  assessment_id BIGINT NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  score NUMERIC(5,2),
+  percentage NUMERIC(5,2),
+  status VARCHAR(20) NOT NULL DEFAULT 'in_progress' CHECK (status IN ('in_progress', 'completed', 'abandoned')),
+  attempt_number INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS assessment_answers (
+  id BIGSERIAL PRIMARY KEY,
+  attempt_id BIGINT NOT NULL REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+  question_id BIGINT NOT NULL REFERENCES assessment_questions(id) ON DELETE CASCADE,
+  selected_option_id BIGINT REFERENCES assessment_question_options(id) ON DELETE SET NULL,
+  is_correct BOOLEAN NOT NULL DEFAULT FALSE,
+  points_earned INTEGER NOT NULL DEFAULT 0,
+  answered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT assessment_answers_attempt_question_key UNIQUE (attempt_id, question_id)
+);
+
+CREATE TABLE IF NOT EXISTS skill_assessment_results (
+  id BIGSERIAL PRIMARY KEY,
+  attempt_id BIGINT NOT NULL REFERENCES assessment_attempts(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skill_id BIGINT NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  score NUMERIC(5,2) NOT NULL DEFAULT 0,
+  percentage NUMERIC(5,2) NOT NULL DEFAULT 0,
+  demonstrated_level INTEGER NOT NULL DEFAULT 1 CHECK (demonstrated_level BETWEEN 1 AND 5),
+  questions_attempted INTEGER NOT NULL DEFAULT 0,
+  questions_correct INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT skill_assessment_results_attempt_skill_key UNIQUE (attempt_id, skill_id)
+);
+
+CREATE INDEX IF NOT EXISTS assessments_job_role_id_idx ON assessments(job_role_id);
+CREATE INDEX IF NOT EXISTS assessment_questions_assessment_id_idx ON assessment_questions(assessment_id);
+CREATE INDEX IF NOT EXISTS assessment_questions_skill_id_idx ON assessment_questions(skill_id);
+CREATE INDEX IF NOT EXISTS assessment_question_options_question_id_idx ON assessment_question_options(question_id);
+CREATE INDEX IF NOT EXISTS assessment_attempts_user_id_idx ON assessment_attempts(user_id);
+CREATE INDEX IF NOT EXISTS assessment_attempts_assessment_id_idx ON assessment_attempts(assessment_id);
+CREATE INDEX IF NOT EXISTS assessment_answers_attempt_id_idx ON assessment_answers(attempt_id);
+CREATE INDEX IF NOT EXISTS skill_assessment_results_user_id_idx ON skill_assessment_results(user_id);
+CREATE INDEX IF NOT EXISTS skill_assessment_results_attempt_id_idx ON skill_assessment_results(attempt_id);
