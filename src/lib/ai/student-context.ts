@@ -37,7 +37,23 @@ export function safeAiInput(context: AiStudentContext) {
   return {
     student: context.student,
     career: context.career,
-    deterministicSkillGap: { readinessScore: context.skillGap.readinessScore, missingSkills: context.skillGap.skills.filter((x) => x.status === "missing").map((x) => x.skillName), needsImprovement: context.skillGap.skills.filter((x) => x.status === "needs_improvement").map((x) => x.skillName), masteredSkills: context.skillGap.skills.filter((x) => x.status === "mastered").map((x) => x.skillName), details: context.skillGap.skills.map(({ skillName, requiredLevel, studentLevel, importance, status }) => ({ skillName, requiredLevel, studentLevel, importance, status })) },
+    deterministicSkillGap: {
+      readinessScore: context.skillGap.readinessScore,
+      hasTakenDiagnosticAssessment: context.skillGap.hasTakenAssessment,
+      missingSkills: context.skillGap.skills.filter((x) => x.status === "missing").map((x) => x.skillName),
+      needsImprovement: context.skillGap.skills.filter((x) => x.status === "needs_improvement").map((x) => x.skillName),
+      masteredSkills: context.skillGap.skills.filter((x) => x.status === "mastered").map((x) => x.skillName),
+      details: context.skillGap.skills.map(({ skillName, requiredLevel, studentLevel, demonstratedLevel, demonstratedPercentage, demonstratedLabel, importance, status }) => ({
+        skillName,
+        requiredLevel,
+        selfReportedLevel: studentLevel,
+        demonstratedLevel: demonstratedLevel ?? "Not assessed",
+        demonstratedPercentage: demonstratedPercentage !== null ? `${demonstratedPercentage}%` : "Not assessed",
+        demonstratedLabel: demonstratedLabel ?? "Not assessed",
+        importance,
+        status,
+      })),
+    },
     curriculum: context.curriculum,
   };
 }
