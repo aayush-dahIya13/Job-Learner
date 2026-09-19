@@ -29,17 +29,17 @@ const journey = [
   ["01", "College Curriculum", "See the subjects that shape your foundation.", "/curriculum"],
   ["02", "Current Skills", "Keep your self-assessment up to date.", "/settings"],
   ["03", "Industry Requirements", "Choose a role and understand what it needs.", "/skill-gap"],
-  ["04", "Skill Gap", "Compare your skills with your chosen direction.", "/skill-gap"],
+  ["04", "Skill Assessment", "Measure demonstrated technical proficiency.", "/assessments"],
   ["05", "Career Guidance", "Connect your context to career insight.", "/career-insights"],
   ["06", "Learning Roadmap", "Turn insight into practical next steps.", "/roadmap"],
 ] as const;
 
 const quickActions = [
+  ["Take Assessment", "Measure demonstrated skills", "/assessments", "✓"],
   ["View curriculum", "Your academic foundation", "/curriculum", "▤"],
   ["Review skill gap", "Skills and role requirements", "/skill-gap", "◔"],
   ["Career insights", "Guidance from your context", "/career-insights", "✦"],
   ["Learning roadmap", "Plan your next steps", "/roadmap", "↗"],
-  ["Settings", "Profile, goals and skills", "/settings", "⚙"],
 ] as const;
 
 export function DashboardOverview({ student, skillGap, curriculum }: DashboardOverviewProps) {
