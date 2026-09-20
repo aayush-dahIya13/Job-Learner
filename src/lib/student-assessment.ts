@@ -40,27 +40,31 @@ export type AssessmentAttemptSummary = {
   attemptNumber: number;
 };
 
+export type DemonstratedLevelLabel = "Beginner" | "Developing" | "Proficient" | "Advanced" | "Expert";
+
 export type SkillAssessmentResult = {
   skillId: number;
   skillName: string;
   score: number;
   percentage: number;
   demonstratedLevel: number;
-  levelLabel: "Beginner" | "Developing" | "Proficient" | "Strong";
+  levelLabel: DemonstratedLevelLabel;
   questionsAttempted: number;
   questionsCorrect: number;
 };
 
-export function getDemonstratedLevelLabel(percentage: number): "Beginner" | "Developing" | "Proficient" | "Strong" {
-  if (percentage >= 85) return "Strong";
-  if (percentage >= 70) return "Proficient";
+export function getDemonstratedLevelLabel(percentage: number): DemonstratedLevelLabel {
+  if (percentage >= 90) return "Expert";
+  if (percentage >= 75) return "Advanced";
+  if (percentage >= 60) return "Proficient";
   if (percentage >= 40) return "Developing";
   return "Beginner";
 }
 
 export function percentageToDemonstratedLevel(percentage: number): number {
-  if (percentage >= 85) return 4;
-  if (percentage >= 70) return 3;
+  if (percentage >= 90) return 5;
+  if (percentage >= 75) return 4;
+  if (percentage >= 60) return 3;
   if (percentage >= 40) return 2;
   return 1;
 }
@@ -429,4 +433,225 @@ export async function getLatestDemonstratedSkills(userId: number) {
     attemptId: row.attempt_id,
     completedAt: row.completed_at,
   }));
+}
+
+export type MilestoneAssessmentItem = {
+  id: number;
+  title: string;
+  description: string | null;
+  durationMinutes: number;
+  totalQuestions: number;
+  passingScore: number;
+  skillsTested: string[];
+  status: "not_started" | "in_progress" | "completed";
+  latestAttemptId: number | null;
+  latestScore: number | null;
+  latestPercentage: number | null;
+  completedAt: Date | string | null;
+};
+
+export async function getMilestoneAssessmentsForUser(userId: number, jobRoleId: number): Promise<MilestoneAssessmentItem[]> {
+  const assResult = await query<{
+    id: number;
+    title: string;
+    description: string | null;
+    duration_minutes: number;
+    total_questions: number;
+    passing_score: number;
+  }>(
+    `SELECT id::integer AS id, title, description, duration_minutes, total_questions, passing_score
+     FROM assessments
+     WHERE job_role_id = $1 AND assessment_type = 'milestone' AND status = 'active'
+     ORDER BY id ASC`,
+    [jobRoleId]
+  );
+
+  if (assResult.rows.length === 0) return [];
+
+  const assessmentIds = assResult.rows.map((a) => a.id);
+
+  const skillsRes = await query<{ assessment_id: number; skill_name: string }>(
+    `SELECT DISTINCT aq.assessment_id::integer AS assessment_id, s.name AS skill_name
+     FROM assessment_questions aq
+     JOIN skills s ON s.id = aq.skill_id
+     WHERE aq.assessment_id = ANY($1::bigint[])
+     ORDER BY aq.assessment_id, s.name`,
+    [assessmentIds]
+  );
+
+  const skillsMap = new Map<number, string[]>();
+  for (const row of skillsRes.rows) {
+    const list = skillsMap.get(row.assessment_id) ?? [];
+    list.push(row.skill_name);
+    skillsMap.set(row.assessment_id, list);
+  }
+
+  const attemptsRes = await query<{
+    id: number;
+    assessment_id: number;
+    score: string | null;
+    percentage: string | null;
+    status: string;
+    completed_at: Date | null;
+  }>(
+    `SELECT id::integer AS id, assessment_id::integer AS assessment_id, score::text, percentage::text, status, completed_at
+     FROM assessment_attempts
+     WHERE user_id = $1 AND assessment_id = ANY($2::bigint[])
+     ORDER BY id DESC`,
+    [userId, assessmentIds]
+  );
+
+  const attemptsMap = new Map<number, { id: number; score: number | null; percentage: number | null; status: string; completedAt: Date | null }>();
+  for (const att of attemptsRes.rows) {
+    if (!attemptsMap.has(att.assessment_id)) {
+      attemptsMap.set(att.assessment_id, {
+        id: att.id,
+        score: att.score !== null ? Number(att.score) : null,
+        percentage: att.percentage !== null ? Number(att.percentage) : null,
+        status: att.status,
+        completedAt: att.completed_at,
+      });
+    }
+  }
+
+  return assResult.rows.map((a) => {
+    const att = attemptsMap.get(a.id);
+    let status: "not_started" | "in_progress" | "completed" = "not_started";
+    if (att) {
+      if (att.status === "completed") status = "completed";
+      else if (att.status === "in_progress") status = "in_progress";
+    }
+
+    return {
+      id: a.id,
+      title: a.title,
+      description: a.description,
+      durationMinutes: a.duration_minutes,
+      totalQuestions: a.total_questions,
+      passingScore: a.passing_score,
+      skillsTested: skillsMap.get(a.id) ?? [],
+      status,
+      latestAttemptId: att ? att.id : null,
+      latestScore: att ? att.score : null,
+      latestPercentage: att ? att.percentage : null,
+      completedAt: att ? att.completedAt : null,
+    };
+  });
+}
+
+export type SkillProgressHistory = {
+  skillId: number;
+  skillName: string;
+  selfReportedLevel: number | null;
+  diagnosticPercentage: number | null;
+  diagnosticLevel: number | null;
+  latestPercentage: number | null;
+  latestDemonstratedLevel: number | null;
+  latestLevelLabel: DemonstratedLevelLabel | null;
+  improvementPercentage: number | null;
+  attempts: {
+    attemptId: number;
+    assessmentTitle: string;
+    assessmentType: string;
+    percentage: number;
+    demonstratedLevel: number;
+    completedAt: Date | string;
+  }[];
+};
+
+export async function getSkillProgressHistory(userId: number): Promise<SkillProgressHistory[]> {
+  const historyRes = await query<{
+    skill_id: number;
+    skill_name: string;
+    attempt_id: number;
+    assessment_title: string;
+    assessment_type: string;
+    percentage: string;
+    demonstrated_level: number;
+    completed_at: Date;
+  }>(
+    `SELECT sar.skill_id::integer AS skill_id, s.name AS skill_name,
+            sar.attempt_id::integer AS attempt_id, a.title AS assessment_title,
+            a.assessment_type, sar.percentage::text, sar.demonstrated_level,
+            aa.completed_at
+     FROM skill_assessment_results sar
+     JOIN skills s ON s.id = sar.skill_id
+     JOIN assessment_attempts aa ON aa.id = sar.attempt_id
+     JOIN assessments a ON a.id = aa.assessment_id
+     WHERE sar.user_id = $1 AND aa.status = 'completed'
+     ORDER BY s.name ASC, aa.completed_at ASC`,
+    [userId]
+  );
+
+  const selfRes = await query<{ skill_id: number; proficiency_level: number }>(
+    `SELECT skill_id::integer AS skill_id, proficiency_level FROM student_skills WHERE user_id = $1`,
+    [userId]
+  );
+  const selfMap = new Map(selfRes.rows.map((s) => [s.skill_id, s.proficiency_level]));
+
+  const map = new Map<number, {
+    skillId: number;
+    skillName: string;
+    attempts: {
+      attemptId: number;
+      assessmentTitle: string;
+      assessmentType: string;
+      percentage: number;
+      demonstratedLevel: number;
+      completedAt: Date | string;
+    }[];
+  }>();
+
+  for (const row of historyRes.rows) {
+    const existing = map.get(row.skill_id) ?? {
+      skillId: row.skill_id,
+      skillName: row.skill_name,
+      attempts: [],
+    };
+
+    existing.attempts.push({
+      attemptId: row.attempt_id,
+      assessmentTitle: row.assessment_title,
+      assessmentType: row.assessment_type,
+      percentage: Number(row.percentage),
+      demonstratedLevel: row.demonstrated_level,
+      completedAt: row.completed_at,
+    });
+
+    map.set(row.skill_id, existing);
+  }
+
+  const result: SkillProgressHistory[] = [];
+
+  for (const [skillId, data] of map.entries()) {
+    const selfReportedLevel = selfMap.get(skillId) ?? null;
+    const diag = data.attempts.find((a) => a.assessmentType === "diagnostic") ?? data.attempts[0];
+    const latest = data.attempts[data.attempts.length - 1];
+
+    const diagnosticPercentage = diag ? diag.percentage : null;
+    const diagnosticLevel = diag ? diag.demonstratedLevel : null;
+    const latestPercentage = latest ? latest.percentage : null;
+    const latestDemonstratedLevel = latest ? latest.demonstratedLevel : null;
+    const latestLevelLabel = latestPercentage !== null ? getDemonstratedLevelLabel(latestPercentage) : null;
+
+    const improvementPercentage =
+      latestPercentage !== null && diagnosticPercentage !== null
+        ? latestPercentage - diagnosticPercentage
+        : null;
+
+    result.push({
+      skillId,
+      skillName: data.skillName,
+      selfReportedLevel,
+      diagnosticPercentage,
+      diagnosticLevel,
+      latestPercentage,
+      latestDemonstratedLevel,
+      latestLevelLabel,
+      improvementPercentage,
+      attempts: data.attempts,
+    });
+  }
+
+  return result;
 }
