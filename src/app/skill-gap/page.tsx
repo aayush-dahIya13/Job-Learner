@@ -3,6 +3,7 @@ import { requireUserId } from "@/lib/auth";
 import { getStudentSkillGap } from "@/lib/student-skill-gap";
 import { CareerGoalSelector } from "@/components/career-goal-selector";
 import { StudentSkillsManager } from "@/components/student-skills-manager";
+import { SkillProgressView } from "@/components/skill-progress-view";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 
 export default async function SkillGapPage() {
@@ -12,7 +13,7 @@ export default async function SkillGapPage() {
   return (
     <DashboardShell
       title="Skill Gap"
-      description="Your readiness is calculated deterministically from role requirements, self-reported skills, and diagnostic assessment performance."
+      description="Your readiness is calculated deterministically from role requirements, self-reported skills, and assessment performance."
     >
       {!gap ? (
         <>
@@ -29,15 +30,15 @@ export default async function SkillGapPage() {
           <section className="dashboard-card dashboard-sage mt-6 p-5 sm:p-6 flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
               <span className="eyebrow text-moss">Evidence Layer</span>
-              <h2 className="text-xl font-bold">Diagnostic Skill Assessment</h2>
+              <h2 className="text-xl font-bold">Continuous Skill Assessments</h2>
               <p className="text-sm text-stone-600 max-w-xl">
                 {gap.hasTakenAssessment
-                  ? "You have completed a diagnostic assessment. Review your objective demonstrated skills below."
-                  : "Measure your actual technical knowledge with an objective diagnostic assessment to validate your self-reported skills."}
+                  ? "You have completed technical skill assessments. Review your demonstrated skill levels and historical growth below."
+                  : "Measure your actual technical knowledge with objective assessments to validate your self-reported skills."}
               </p>
             </div>
             <Link className="btn-primary px-5 py-2.5 text-sm" href="/assessments">
-              {gap.hasTakenAssessment ? "Retake / View Assessment →" : "Take Diagnostic Assessment →"}
+              {gap.hasTakenAssessment ? "Take Checkpoint / Diagnostic →" : "Take Diagnostic Assessment →"}
             </Link>
           </section>
 
@@ -56,6 +57,12 @@ export default async function SkillGapPage() {
             ))}
           </section>
 
+          {/* Historical Skill Progress View */}
+          {gap.progressHistory && gap.progressHistory.length > 0 && (
+            <SkillProgressView history={gap.progressHistory} />
+          )}
+
+          {/* Skill Breakdown */}
           <section className="surface mt-6 p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -90,10 +97,16 @@ export default async function SkillGapPage() {
                       <span>Self-reported: <strong>{skill.studentLevel}/5</strong></span>
                       <span>Required: <strong>{skill.requiredLevel}/5</strong></span>
                     </div>
+                    {skill.diagnosticPercentage !== null && (
+                      <div className="flex justify-between text-stone-500">
+                        <span>Initial Diagnostic: <strong>{skill.diagnosticPercentage}%</strong></span>
+                        <span>Level: <strong>Level {skill.diagnosticLevel}</strong></span>
+                      </div>
+                    )}
                     {skill.demonstratedLevel !== null && (
                       <div className="flex justify-between font-medium text-primary">
-                        <span>Demonstrated Score: <strong>{skill.demonstratedPercentage}%</strong></span>
-                        <span>Level: <strong>{skill.demonstratedLabel} ({skill.demonstratedLevel}/5)</strong></span>
+                        <span>Latest Demonstrated: <strong>{skill.demonstratedPercentage}%</strong></span>
+                        <span>Level: <strong>{skill.demonstratedLabel} (Level {skill.demonstratedLevel}/5)</strong></span>
                       </div>
                     )}
                   </div>
@@ -101,7 +114,7 @@ export default async function SkillGapPage() {
                   <div className="h-2 overflow-hidden rounded-full bg-stone-100">
                     <div
                       className="h-full bg-brand"
-                      style={{ width: `${Math.min(100, (skill.studentLevel / skill.requiredLevel) * 100)}%` }}
+                      style={{ width: `${Math.min(100, ((skill.demonstratedLevel ?? skill.studentLevel) / skill.requiredLevel) * 100)}%` }}
                     />
                   </div>
                 </article>
