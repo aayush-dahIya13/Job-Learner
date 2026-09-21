@@ -83,12 +83,10 @@ async function generate(context: AiStudentContext, kind: "analysis" | "roadmap")
     }
     const parsed = schema.safeParse(parsedData);
     if (!parsed.success) {
-      console.error("[GEMINI_ZOD_VALIDATION_ERROR]", JSON.stringify(parsed.error.format(), null, 2));
       throw new AiServiceError("AI_INVALID_RESPONSE", "The AI service returned an invalid response. Please try again.");
     }
     return parsed.data;
   } catch (error) {
-    console.error("[GEMINI_GENERATE_ERROR]", error);
     if (error instanceof AiServiceError) throw error;
     throw new AiServiceError("AI_UNAVAILABLE", "AI guidance is temporarily unavailable. Please try again shortly.");
   }

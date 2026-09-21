@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const text = z.string().trim().min(1).max(700);
+const longText = z.string().trim().min(1).max(3000);
 export const careerAnalysisSchema = z.object({
   careerSummary: text,
   strengths: z.array(text).max(10),
@@ -28,12 +29,12 @@ export const extraResourceSchema = z.object({
 export const roadmapStepSchema = z.object({
   stepNumber: z.number().int().min(1).max(100),
   title: text,
-  description: text,
+  description: longText,
   skills: z.array(text).min(1).max(10),
   level: z.enum(["foundation", "intermediate", "advanced", "beginner"]).default("foundation"),
-  whyThisStep: text,
+  whyThisStep: longText,
   prerequisites: z.array(text).max(10),
-  practiceIdea: text,
+  practiceIdea: longText,
   videos: z.array(videoResourceSchema).max(10).default([]),
   extraResources: z.array(extraResourceSchema).max(10).default([]),
 });
@@ -41,7 +42,7 @@ export const roadmapStepSchema = z.object({
 export const roadmapPhaseSchema = z.object({
   phase: z.number().int().min(1).max(10),
   title: text,
-  objective: text,
+  objective: longText,
   difficulty: z.enum(["foundation", "intermediate", "advanced"]),
   steps: z.array(roadmapStepSchema).min(1).max(10),
 });

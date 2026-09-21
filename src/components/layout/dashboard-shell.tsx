@@ -8,7 +8,7 @@ import { BrandLogo } from "@/components/brand-logo";
 
 const items = [
   ["Dashboard", "/dashboard", "⌂"], ["Curriculum", "/curriculum", "▤"], ["Skill Gap", "/skill-gap", "▥"],
-  ["Assessment", "/assessments", "✓"], ["Career Insights", "/career-insights", "♧"], ["Roadmap", "/roadmap", "⌑"],
+  ["Assessment", "/assessments", "✓"], ["Verified Skills", "/verified-skills", "🛡"], ["Career Insights", "/career-insights", "♧"], ["Roadmap", "/roadmap", "⌑"],
   ["Notes", "/notes", "✎"], ["Settings", "/settings", "⚙"],
 ] as const;
 const sidebarStorageKey = "job-learner:sidebar-collapsed";
