@@ -36,6 +36,7 @@ const journey = [
 
 const quickActions = [
   ["Take Assessment", "Measure demonstrated skills", "/assessments", "✓"],
+  ["Verified Skills", "Assessment evidence profile", "/verified-skills", "🛡"],
   ["View curriculum", "Your academic foundation", "/curriculum", "▤"],
   ["Review skill gap", "Skills and role requirements", "/skill-gap", "◔"],
   ["Career insights", "Guidance from your context", "/career-insights", "✦"],

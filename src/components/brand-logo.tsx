@@ -12,7 +12,7 @@ type BrandLogoProps = {
 export function BrandLogo({ href, compact = false, showTagline = true, className = "" }: BrandLogoProps) {
   const content = <>
     <span className={`brand-logo-image ${compact ? "brand-logo-image-compact" : ""}`}>
-      <Image src="/assets/job-learner-logo.svg" alt="JOB-LEARNER JL monogram" fill sizes={compact ? "64px" : "88px"} priority className="object-contain" />
+      <Image src="/assets/job-learner-logo.svg" alt="JOB-LEARNER JL monogram" width={compact ? 66 : 76} height={compact ? 66 : 76} priority className="h-full w-full object-contain" />
     </span>
     {!compact && <span className="brand-logo-copy"><b>JOB-LEARNER</b>{showTagline && <small>Career Intelligence</small>}</span>}
   </>;

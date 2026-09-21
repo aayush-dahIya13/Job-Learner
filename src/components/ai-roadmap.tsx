@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { RoadmapPhase, RoadmapStep, VideoResource, ExtraResource } from "@/lib/ai/schemas";
+import type { MilestoneAssessmentItem } from "@/lib/student-assessment";
 
 type StoredRoadmap = {
   id?: number;
@@ -12,6 +14,7 @@ type StoredRoadmap = {
 
 export function AiRoadmap() {
   const [data, setData] = useState<StoredRoadmap | null>(null);
+  const [milestones, setMilestones] = useState<MilestoneAssessmentItem[]>([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -28,11 +31,14 @@ export function AiRoadmap() {
       // Ignore local storage parse errors
     }
 
-    fetch("/api/ai/roadmap")
-      .then(async (r) => {
-        const x = await r.json();
-        if (!r.ok) throw new Error(x.error);
-        setData(x.roadmap);
+    Promise.all([
+      fetch("/api/ai/roadmap").then((r) => r.json()),
+      fetch("/api/student/milestones").then((r) => r.json()),
+    ])
+      .then(([roadmapRes, milestoneRes]) => {
+        if (roadmapRes.error) throw new Error(roadmapRes.error);
+        setData(roadmapRes.roadmap);
+        if (milestoneRes.milestones) setMilestones(milestoneRes.milestones);
       })
       .catch((e) => setMessage(e.message || "Unable to load roadmap."))
       .finally(() => setLoading(false));
@@ -58,6 +64,11 @@ export function AiRoadmap() {
       const x = await r.json();
       if (!r.ok) throw new Error(x.error);
       setData(x.roadmap);
+
+      // Refresh milestone assessments
+      const mRes = await fetch("/api/student/milestones");
+      const mData = await mRes.json();
+      if (mData.milestones) setMilestones(mData.milestones);
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Unable to generate roadmap.");
     } finally {
@@ -181,55 +192,173 @@ export function AiRoadmap() {
 
           {/* Phases & Steps */}
           <div className="space-y-12">
-            {data.phases.map((phase, phaseIndex) => (
-              <section key={phase.phase} className="space-y-4">
-                {/* Phase Header Banner */}
-                <div className="rounded-2xl border border-[var(--jl-border)] bg-gradient-to-r from-[var(--jl-surface-muted)] to-[var(--jl-surface)] p-5 shadow-sm sm:p-6">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="rounded-lg bg-[var(--jl-primary)] px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-[var(--jl-on-primary)]">
-                      Phase {phase.phase} · {phase.difficulty}
-                    </span>
-                    <span className="text-xs font-semibold text-[var(--jl-text-muted)]">
-                      {phase.steps?.length || 0} Steps in this phase
-                    </span>
-                  </div>
-                  <h3 className="mt-2 text-xl font-extrabold text-[var(--jl-text)] sm:text-2xl">
-                    {phase.title}
-                  </h3>
-                  <p className="mt-1 text-sm text-[var(--jl-text-muted)]">
-                    <strong className="font-semibold text-[var(--jl-text)]">Phase Objective:</strong> {phase.objective}
-                  </p>
-                </div>
+            {data.phases.map((phase, phaseIndex) => {
+              const phaseSteps = phase.steps || [];
+              const phaseCompletedCount = phaseSteps.filter((s) => completedSteps.includes(s.stepNumber)).length;
 
-                {/* Steps List */}
-                <div className="grid gap-5">
-                  {(phase.steps || []).map((step) => {
-                    const isCompleted = completedSteps.includes(step.stepNumber);
-                    return (
-                      <StepCard
-                        key={step.stepNumber}
-                        step={step}
-                        isCompleted={isCompleted}
-                        onToggleCompletion={() => toggleStepCompletion(step.stepNumber)}
-                      />
-                    );
-                  })}
-                </div>
+              // Find milestone for this phase
+              const milestone = milestones[phaseIndex] || null;
 
-                {/* Flow Connector Arrow */}
-                {phaseIndex < data.phases.length - 1 && (
-                  <div className="flex justify-center py-2">
-                    <div className="grid h-10 w-10 place-items-center rounded-full border border-[var(--jl-border)] bg-[var(--jl-surface)] text-lg text-[var(--jl-primary)] shadow-sm">
-                      ↓
+              let milestoneState: "NOT_STARTED" | "IN_PROGRESS" | "READY_FOR_ASSESSMENT" | "ASSESSMENT_COMPLETED" = "NOT_STARTED";
+              if (milestone) {
+                if (milestone.status === "completed") {
+                  milestoneState = "ASSESSMENT_COMPLETED";
+                } else if (phaseCompletedCount === phaseSteps.length && phaseSteps.length > 0) {
+                  milestoneState = "READY_FOR_ASSESSMENT";
+                } else if (phaseCompletedCount > 0 || milestone.status === "in_progress") {
+                  milestoneState = "IN_PROGRESS";
+                }
+              }
+
+              return (
+                <section key={phase.phase} className="space-y-4">
+                  {/* Phase Header Banner */}
+                  <div className="rounded-2xl border border-[var(--jl-border)] bg-gradient-to-r from-[var(--jl-surface-muted)] to-[var(--jl-surface)] p-5 shadow-sm sm:p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="rounded-lg bg-[var(--jl-primary)] px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-[var(--jl-on-primary)]">
+                        Phase {phase.phase} · {phase.difficulty}
+                      </span>
+                      <span className="text-xs font-semibold text-[var(--jl-text-muted)]">
+                        {phaseCompletedCount}/{phaseSteps.length} Steps Completed
+                      </span>
                     </div>
+                    <h3 className="mt-2 text-xl font-extrabold text-[var(--jl-text)] sm:text-2xl">
+                      {phase.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-[var(--jl-text-muted)]">
+                      <strong className="font-semibold text-[var(--jl-text)]">Phase Objective:</strong> {phase.objective}
+                    </p>
                   </div>
-                )}
-              </section>
-            ))}
+
+                  {/* Steps List */}
+                  <div className="grid gap-5">
+                    {phaseSteps.map((step) => {
+                      const isCompleted = completedSteps.includes(step.stepNumber);
+                      return (
+                        <StepCard
+                          key={step.stepNumber}
+                          step={step}
+                          isCompleted={isCompleted}
+                          onToggleCompletion={() => toggleStepCompletion(step.stepNumber)}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  {/* Milestone Assessment Checkpoint Card */}
+                  {milestone && (
+                    <MilestoneCheckpointCard
+                      milestone={milestone}
+                      milestoneState={milestoneState}
+                    />
+                  )}
+
+                  {/* Flow Connector Arrow */}
+                  {phaseIndex < data.phases.length - 1 && (
+                    <div className="flex justify-center py-2">
+                      <div className="grid h-10 w-10 place-items-center rounded-full border border-[var(--jl-border)] bg-[var(--jl-surface)] text-lg text-[var(--jl-primary)] shadow-sm">
+                        ↓
+                      </div>
+                    </div>
+                  )}
+                </section>
+              );
+            })}
           </div>
         </div>
       )}
     </section>
+  );
+}
+
+function MilestoneCheckpointCard({
+  milestone,
+  milestoneState,
+}: {
+  milestone: MilestoneAssessmentItem;
+  milestoneState: "NOT_STARTED" | "IN_PROGRESS" | "READY_FOR_ASSESSMENT" | "ASSESSMENT_COMPLETED";
+}) {
+  return (
+    <article className="mt-6 rounded-2xl border border-[var(--jl-primary)]/40 bg-[var(--jl-surface)] p-5 shadow-card sm:p-6 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-black tracking-widest text-[var(--jl-primary)] uppercase">
+            MILESTONE ASSESSMENT
+          </span>
+          <span
+            className={`rounded-md px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
+              milestoneState === "ASSESSMENT_COMPLETED"
+                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                : milestoneState === "READY_FOR_ASSESSMENT"
+                ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                : milestoneState === "IN_PROGRESS"
+                ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
+                : "bg-[var(--jl-surface-muted)] text-[var(--jl-text-muted)]"
+            }`}
+          >
+            {milestoneState.replace(/_/g, " ")}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3 text-xs text-[var(--jl-text-muted)] font-semibold">
+          <span>⏱ {milestone.durationMinutes} Minutes</span>
+          <span>📋 {milestone.totalQuestions} Questions</span>
+        </div>
+      </div>
+
+      <div>
+        <h4 className="text-lg font-bold text-[var(--jl-text)] sm:text-xl">
+          {milestone.title}
+        </h4>
+        <p className="mt-1 text-xs text-[var(--jl-text-muted)] sm:text-sm">
+          {milestone.description}
+        </p>
+      </div>
+
+      {milestoneState === "ASSESSMENT_COMPLETED" && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 flex items-center justify-between text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
+          <div className="flex items-center gap-2">
+            <span className="text-base">✅</span>
+            <span className="font-bold text-emerald-900 dark:text-emerald-200">
+              Checkpoint Passed · Demonstrated Score: {milestone.latestPercentage}%
+            </span>
+          </div>
+          {milestone.latestAttemptId && (
+            <Link
+              href={`/assessments/${milestone.latestAttemptId}`}
+              className="font-bold text-emerald-800 hover:underline dark:text-emerald-300"
+            >
+              View Result Report →
+            </Link>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-[var(--jl-border)]">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-bold text-[var(--jl-text-muted)]">Skills Tested:</span>
+          {milestone.skillsTested.map((s) => (
+            <span
+              key={s}
+              className="rounded-lg border border-[var(--jl-border)] bg-[var(--jl-canvas-soft)] px-2 py-0.5 text-xs font-medium text-[var(--jl-text)]"
+            >
+              {s}
+            </span>
+          ))}
+        </div>
+
+        <Link
+          href={`/assessments?assessmentId=${milestone.id}`}
+          className="btn-primary inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold"
+        >
+          {milestoneState === "ASSESSMENT_COMPLETED"
+            ? "Retake Checkpoint Assessment →"
+            : milestoneState === "READY_FOR_ASSESSMENT"
+            ? "Take Checkpoint Assessment →"
+            : "Take Checkpoint Assessment →"}
+        </Link>
+      </div>
+    </article>
   );
 }
 
