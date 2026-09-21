@@ -5,7 +5,6 @@ import { AiContextError, loadAiStudentContext } from "@/lib/ai/student-context";
 import { latestRoadmap, saveRoadmap } from "@/lib/ai/store";
 export const runtime = "nodejs";
 function errorResponse(error: unknown) {
-  console.error("[ROADMAP_POST_ERROR]", error);
   if (error instanceof AiContextError || error instanceof AiServiceError)
     return NextResponse.json({ error: error.message, code: error.code }, { status: error.code === "AI_NOT_CONFIGURED" ? 503 : 422 });
   return NextResponse.json({ error: "Unable to generate a roadmap right now." }, { status: 500 });

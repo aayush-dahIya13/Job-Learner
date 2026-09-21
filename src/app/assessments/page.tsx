@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUserId } from "@/lib/auth";
+import { formatDate } from "@/lib/date";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { query } from "@/lib/db";
 import {
@@ -258,7 +259,7 @@ export default async function AssessmentsPage({
                   <div>
                     <div className="flex items-center justify-between text-xs text-stone-500 font-semibold">
                       <span className="capitalize">{att.assessment_type} · Attempt #{att.attempt_number}</span>
-                      <span>{new Date(att.completed_at).toLocaleDateString()}</span>
+                      <span>{formatDate(att.completed_at)}</span>
                     </div>
                     <h4 className="mt-2 font-bold text-base">{att.title}</h4>
                     <div className="mt-3 flex items-baseline gap-2">
