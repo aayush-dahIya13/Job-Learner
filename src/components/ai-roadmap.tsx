@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { RoadmapPhase, RoadmapStep, VideoResource, ExtraResource } from "@/lib/ai/schemas";
 import type { MilestoneAssessmentItem } from "@/lib/student-assessment";
+import { getDemonstratedLevelLabel } from "@/lib/proficiency";
 
 type StoredRoadmap = {
   id?: number;
@@ -21,7 +22,7 @@ export function AiRoadmap() {
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 
   useEffect(() => {
-    // Load local step completion state if available
+    // 1. Initial local state fallback
     try {
       const saved = localStorage.getItem("job_learner_completed_steps");
       if (saved) {
@@ -31,30 +32,54 @@ export function AiRoadmap() {
       // Ignore local storage parse errors
     }
 
+    // 2. Fetch authenticated roadmap, milestones, and persisted step progress from backend
     Promise.all([
       fetch("/api/ai/roadmap").then((r) => r.json()),
       fetch("/api/student/milestones").then((r) => r.json()),
+      fetch("/api/student/roadmap-progress").then((r) => r.json()),
     ])
-      .then(([roadmapRes, milestoneRes]) => {
+      .then(([roadmapRes, milestoneRes, progressRes]) => {
         if (roadmapRes.error) throw new Error(roadmapRes.error);
         setData(roadmapRes.roadmap);
         if (milestoneRes.milestones) setMilestones(milestoneRes.milestones);
+        if (progressRes.completedSteps && Array.isArray(progressRes.completedSteps)) {
+          setCompletedSteps(progressRes.completedSteps);
+          try {
+            localStorage.setItem("job_learner_completed_steps", JSON.stringify(progressRes.completedSteps));
+          } catch {
+            // Ignore
+          }
+        }
       })
       .catch((e) => setMessage(e.message || "Unable to load roadmap."))
       .finally(() => setLoading(false));
   }, []);
 
-  const toggleStepCompletion = (stepNumber: number) => {
-    setCompletedSteps((prev) => {
-      const next = prev.includes(stepNumber) ? prev.filter((id) => id !== stepNumber) : [...prev, stepNumber];
-      try {
-        localStorage.setItem("job_learner_completed_steps", JSON.stringify(next));
-      } catch {
-        // Ignore local storage errors
-      }
-      return next;
-    });
+  const toggleStepCompletion = async (stepNumber: number) => {
+    const isCompletedNow = !completedSteps.includes(stepNumber);
+    const nextSteps = isCompletedNow
+      ? [...completedSteps, stepNumber]
+      : completedSteps.filter((id) => id !== stepNumber);
+
+    setCompletedSteps(nextSteps);
+    try {
+      localStorage.setItem("job_learner_completed_steps", JSON.stringify(nextSteps));
+    } catch {
+      // Ignore local storage errors
+    }
+
+    // Persist authenticated step progress to DB server-side
+    try {
+      await fetch("/api/student/roadmap-progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stepNumber, completed: isCompletedNow }),
+      });
+    } catch (e) {
+      console.error("Failed to sync step progress with server:", e);
+    }
   };
+
 
   async function generate() {
     setGenerating(true);
@@ -320,7 +345,7 @@ function MilestoneCheckpointCard({
           <div className="flex items-center gap-2">
             <span className="text-base">✅</span>
             <span className="font-bold text-emerald-900 dark:text-emerald-200">
-              Checkpoint Passed · Demonstrated Score: {milestone.latestPercentage}%
+              Checkpoint Passed · Score: {milestone.latestPercentage}% ({getDemonstratedLevelLabel(milestone.latestPercentage ?? 0)})
             </span>
           </div>
           {milestone.latestAttemptId && (
