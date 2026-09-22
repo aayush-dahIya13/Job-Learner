@@ -2,8 +2,11 @@ import { query } from "@/lib/db";
 import {
   percentageToDemonstratedLevel,
   getDemonstratedLevelLabel,
+  resolveCurrentDemonstratedSkill,
+  resolveEffectiveSkillState,
   type DemonstratedLevelLabel,
-} from "@/lib/student-assessment";
+} from "@/lib/proficiency";
+
 
 export type VerifiedSkillEvidence = {
   attemptId: number;
@@ -189,7 +192,9 @@ export async function getVerifiedSkillProfile(userId: number): Promise<VerifiedS
 
     // Diagnostic assessment: pick first attempt of type 'diagnostic' or first attempt overall if none tagged diagnostic
     const diagAttempt = attempts.find((a) => a.assessmentType === "diagnostic") ?? (attempts.length > 0 ? attempts[0] : null);
-    const latestAttempt = attempts.length > 0 ? attempts[attempts.length - 1] : null;
+    
+    // Use centralized evidence strategy for latest demonstrated skill
+    const latestAttempt = resolveCurrentDemonstratedSkill(attempts);
 
     const diagnosticScore = diagAttempt ? diagAttempt.percentage : null;
     const diagnosticLevel = diagAttempt ? diagAttempt.demonstratedLevel : null;
@@ -198,6 +203,7 @@ export async function getVerifiedSkillProfile(userId: number): Promise<VerifiedS
     const latestDemonstratedScore = latestAttempt ? latestAttempt.percentage : null;
     const demonstratedLevel = latestAttempt ? latestAttempt.demonstratedLevel : null;
     const demonstratedLabel = latestAttempt ? latestAttempt.levelLabel : null;
+
 
     const improvementPercentage =
       latestDemonstratedScore !== null && diagnosticScore !== null

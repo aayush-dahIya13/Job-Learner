@@ -1,6 +1,18 @@
 import { query } from "@/lib/db";
 import { calculateSkillGap } from "@/lib/skill-gap";
 import { getLatestDemonstratedSkills, getSkillProgressHistory } from "@/lib/student-assessment";
+import { resolveEffectiveSkillState, type DemonstratedLevelLabel } from "@/lib/proficiency";
+
+export type AssessmentWeakSkill = {
+  skillId: number;
+  skillName: string;
+  score: number;
+  level: number;
+  label: DemonstratedLevelLabel;
+  isIndustryRequired: boolean;
+  isHighPriority: boolean;
+  completedAt: Date | string;
+};
 
 export async function getStudentSkillGap(userId: number) {
   const goal = await query<{ id: number; title: string }>(
@@ -38,6 +50,7 @@ export async function getStudentSkillGap(userId: number) {
     current.rows.map((row) => ({ skillId: row.skill_id, proficiencyLevel: row.proficiency_level }))
   );
 
+  const requiredSkillIds = new Set(required.rows.map((r) => r.skill_id));
   const demonstratedMap = new Map(demonstrated.map((d) => [d.skillId, d]));
   const diagMap = new Map(diagRes.rows.map((d) => [d.skill_id, { percentage: Number(d.percentage), level: d.demonstrated_level }]));
   const historyMap = new Map(progressHistory.map((h) => [h.skillId, h]));
@@ -47,15 +60,36 @@ export async function getStudentSkillGap(userId: number) {
     const diag = diagMap.get(skill.skillId);
     const history = historyMap.get(skill.skillId);
 
-    // Compute effective level for gap calculation: prefer demonstrated level if available, otherwise self-reported
-    const effectiveLevel = demo ? demo.demonstratedLevel : skill.studentLevel;
-    const gap = Math.max(skill.requiredLevel - effectiveLevel, 0);
-    const status = effectiveLevel >= skill.requiredLevel ? ("mastered" as const) : effectiveLevel > 0 ? ("needs_improvement" as const) : ("missing" as const);
+    const effectiveState = resolveEffectiveSkillState({
+      skillId: skill.skillId,
+      skillName: skill.skillName,
+      latestDemonstrated: demo ? {
+        attemptId: demo.attemptId,
+        assessmentId: 0,
+        assessmentTitle: "",
+        assessmentType: "",
+        score: demo.percentage,
+        percentage: demo.percentage,
+        demonstratedLevel: demo.demonstratedLevel,
+        levelLabel: demo.levelLabel,
+        completedAt: demo.completedAt,
+      } : null,
+      selfReportedLevel: skill.studentLevel,
+      requiredLevel: skill.requiredLevel,
+    });
+
+    const status: "mastered" | "needs_improvement" | "missing" =
+      effectiveState.effectiveLevel >= skill.requiredLevel
+        ? "mastered"
+        : effectiveState.effectiveLevel > 0
+        ? "needs_improvement"
+        : "missing";
 
     return {
       ...skill,
-      effectiveLevel,
-      gap,
+      effectiveLevel: effectiveState.effectiveLevel,
+      effectiveLabel: effectiveState.effectiveLabel,
+      gap: effectiveState.gap,
       status,
       diagnosticPercentage: diag ? diag.percentage : null,
       diagnosticLevel: diag ? diag.level : null,
@@ -67,11 +101,59 @@ export async function getStudentSkillGap(userId: number) {
     };
   });
 
+  // Assessment-Driven Skill Gap Analysis
+  const assessmentWeakSkills: AssessmentWeakSkill[] = [];
+  const highPrioritySkills: AssessmentWeakSkill[] = [];
+  const onTrackAssessedSkills: Array<{ skillId: number; skillName: string; percentage: number; level: number; label: DemonstratedLevelLabel }> = [];
+  const nonCareerWeakSkills: AssessmentWeakSkill[] = [];
+
+  for (const demo of demonstrated) {
+    const isRequired = requiredSkillIds.has(demo.skillId);
+    const isWeak = demo.demonstratedLevel < 3; // Demonstrated Level 1 (Beginner) or Level 2 (Developing) < 60%
+
+    const item: AssessmentWeakSkill = {
+      skillId: demo.skillId,
+      skillName: demo.skillName,
+      score: demo.percentage,
+      level: demo.demonstratedLevel,
+      label: demo.levelLabel,
+      isIndustryRequired: isRequired,
+      isHighPriority: isRequired && isWeak,
+      completedAt: demo.completedAt,
+    };
+
+    if (isWeak) {
+      assessmentWeakSkills.push(item);
+      if (isRequired) {
+        highPrioritySkills.push(item);
+      } else {
+        nonCareerWeakSkills.push(item);
+      }
+    } else {
+      onTrackAssessedSkills.push({
+        skillId: demo.skillId,
+        skillName: demo.skillName,
+        percentage: demo.percentage,
+        level: demo.demonstratedLevel,
+        label: demo.levelLabel,
+      });
+    }
+  }
+
+  // Identify required skills that have no assessment evidence yet
+  const unassessedRequiredSkills = enrichedSkills.filter((s) => s.demonstratedLevel === null);
+
   return {
     ...baseGap,
     hasTakenAssessment: demonstrated.length > 0,
     hasTakenDiagnostic: diagRes.rows.length > 0,
     progressHistory,
     skills: enrichedSkills,
+    // Assessment-Driven Skill Gap breakdown
+    assessmentWeakSkills,
+    highPrioritySkills,
+    onTrackAssessedSkills,
+    nonCareerWeakSkills,
+    unassessedRequiredSkills,
   };
 }

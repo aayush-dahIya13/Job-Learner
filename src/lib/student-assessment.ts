@@ -40,7 +40,13 @@ export type AssessmentAttemptSummary = {
   attemptNumber: number;
 };
 
-export type DemonstratedLevelLabel = "Beginner" | "Developing" | "Proficient" | "Advanced" | "Expert";
+import {
+  percentageToDemonstratedLevel,
+  getDemonstratedLevelLabel,
+  resolveCurrentDemonstratedSkill,
+  type DemonstratedLevelLabel,
+  type DemonstratedSkillAttempt,
+} from "@/lib/proficiency";
 
 export type SkillAssessmentResult = {
   skillId: number;
@@ -53,21 +59,7 @@ export type SkillAssessmentResult = {
   questionsCorrect: number;
 };
 
-export function getDemonstratedLevelLabel(percentage: number): DemonstratedLevelLabel {
-  if (percentage >= 90) return "Expert";
-  if (percentage >= 75) return "Advanced";
-  if (percentage >= 60) return "Proficient";
-  if (percentage >= 40) return "Developing";
-  return "Beginner";
-}
 
-export function percentageToDemonstratedLevel(percentage: number): number {
-  if (percentage >= 90) return 5;
-  if (percentage >= 75) return 4;
-  if (percentage >= 60) return 3;
-  if (percentage >= 40) return 2;
-  return 1;
-}
 
 // Fetch active assessment for a job role
 export async function getActiveAssessmentForRole(jobRoleId: number): Promise<AssessmentDetail | null> {

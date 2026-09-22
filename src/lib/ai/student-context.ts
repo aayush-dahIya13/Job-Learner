@@ -40,6 +40,8 @@ export function safeAiInput(context: AiStudentContext) {
     deterministicSkillGap: {
       readinessScore: context.skillGap.readinessScore,
       hasTakenDiagnosticAssessment: context.skillGap.hasTakenAssessment,
+      highPriorityGaps: context.skillGap.highPrioritySkills.map((x) => ({ skillName: x.skillName, score: `${x.score}%`, label: x.label })),
+      assessmentWeakSkills: context.skillGap.assessmentWeakSkills.map((x) => ({ skillName: x.skillName, score: `${x.score}%`, label: x.label, isHighPriority: x.isHighPriority })),
       missingSkills: context.skillGap.skills.filter((x) => x.status === "missing").map((x) => x.skillName),
       needsImprovement: context.skillGap.skills.filter((x) => x.status === "needs_improvement").map((x) => x.skillName),
       masteredSkills: context.skillGap.skills.filter((x) => x.status === "mastered").map((x) => x.skillName),

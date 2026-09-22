@@ -81,7 +81,8 @@ export function AssessmentRunner({
         localStorage.removeItem(`jl_assessment_answers_${attemptId}`);
       } catch (e) {}
 
-      // Redirect to detailed result page
+      // Refresh server components & redirect to detailed result page
+      router.refresh();
       router.push(`/assessments/${attemptId}`);
     } catch (err: any) {
       setErrorMsg(err.message || "An error occurred during submission.");
