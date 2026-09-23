@@ -39,7 +39,7 @@ Stage 2 adds college-to-branch management, official curricula (semesters and sub
    openssl rand -base64 32
    ```
 
-4. Create and seed the schema:
+4. Create and seed the schema.xyz:
 
    ```bash
    npm run db:schema
