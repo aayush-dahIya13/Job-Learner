@@ -5,7 +5,7 @@ import { CareerGoalSelector } from "@/components/career-goal-selector";
 import { StudentSkillsManager } from "@/components/student-skills-manager";
 import { SkillProgressView } from "@/components/skill-progress-view";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { formatDate } from "@/lib/date";
+import { formatDate, formatDateShort } from "@/lib/date";
 
 export default async function SkillGapPage() {
   const id = await requireUserId();
@@ -37,6 +37,11 @@ export default async function SkillGapPage() {
                   ? "Your demonstrated skill levels update dynamically whenever you complete diagnostic or milestone tests."
                   : "Measure your actual technical knowledge with objective assessments to validate your self-reported skills."}
               </p>
+              {gap.lastAssessedAt && (
+                <p className="text-xs text-stone-500 dark:text-stone-400 pt-1">
+                  Last Assessed: <span className="font-semibold text-stone-700 dark:text-stone-300">{formatDateShort(gap.lastAssessedAt)}</span>
+                </p>
+              )}
             </div>
             <Link className="btn-primary px-5 py-2.5 text-sm shrink-0" href="/assessments">
               {gap.hasTakenAssessment ? "Take Checkpoint / Diagnostic →" : "Take Diagnostic Assessment →"}
