@@ -143,10 +143,22 @@ export async function getStudentSkillGap(userId: number) {
   // Identify required skills that have no assessment evidence yet
   const unassessedRequiredSkills = enrichedSkills.filter((s) => s.demonstratedLevel === null);
 
+  // Derive the most recent assessment completion timestamp from the already-
+  // fetched demonstrated skills — no additional database query required.
+  const lastAssessedAt: Date | string | null =
+    demonstrated.length > 0
+      ? demonstrated.reduce<Date | string>((latest, d) => {
+          const t = typeof d.completedAt === "string" ? new Date(d.completedAt) : d.completedAt;
+          const l = typeof latest === "string" ? new Date(latest) : latest;
+          return t > l ? d.completedAt : latest;
+        }, demonstrated[0].completedAt)
+      : null;
+
   return {
     ...baseGap,
     hasTakenAssessment: demonstrated.length > 0,
     hasTakenDiagnostic: diagRes.rows.length > 0,
+    lastAssessedAt,
     progressHistory,
     skills: enrichedSkills,
     // Assessment-Driven Skill Gap breakdown
