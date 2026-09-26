@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint .",
     "db:schema": "psql \"$DATABASE_URL\" -f database/schema.sql",
-    "db:seed": "psql \"$DATABASE_URL\" -f database/seed.sql"
+    "db:seed": "psql \"$DATABASE_URL\" -f database/seed.sql",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@google/genai": "^2.21.0",
@@ -32,6 +34,7 @@
     "eslint-config-next": "^15.2.4",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vitest": "^5.0.2"
   }
 }
