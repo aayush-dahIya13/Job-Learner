@@ -80,7 +80,6 @@ export function AiRoadmap() {
     }
   };
 
-
   async function generate() {
     setGenerating(true);
     setMessage("");
@@ -114,6 +113,17 @@ export function AiRoadmap() {
   const totalStepsCount = allSteps.length;
   const completedCount = allSteps.filter((s) => completedSteps.includes(s.stepNumber)).length;
   const progressPercent = totalStepsCount > 0 ? Math.round((completedCount / totalStepsCount) * 100) : 0;
+  const completedCheckpointsCount = milestones.filter((m) => m.status === "completed").length;
+
+  // Build a lookup map of demonstrated levels for all tested skills
+  const demoSkillsMap = new Map<string, { demonstratedLevel: number | null; levelLabel: string | null; percentage: number | null }>();
+  for (const m of milestones) {
+    if (m.skillsWithDemonstrated) {
+      for (const s of m.skillsWithDemonstrated) {
+        demoSkillsMap.set(s.skillName.toLowerCase(), s);
+      }
+    }
+  }
 
   return (
     <section className="mt-6 space-y-6">
@@ -195,7 +205,7 @@ export function AiRoadmap() {
                   {data.phases.length} Phases
                 </span>
                 <span className="rounded-full border border-[var(--jl-border)] bg-[var(--jl-canvas-soft)] px-3 py-1 text-xs font-semibold text-[var(--jl-text-muted)]">
-                  {totalStepsCount} Guided Steps
+                  {completedCheckpointsCount}/{milestones.length} Checkpoints Passed
                 </span>
                 <span className="rounded-full bg-[var(--jl-surface-muted)] px-3 py-1 text-xs font-bold text-[var(--jl-primary)]">
                   Readiness: {data.readiness_score}%
@@ -221,8 +231,12 @@ export function AiRoadmap() {
               const phaseSteps = phase.steps || [];
               const phaseCompletedCount = phaseSteps.filter((s) => completedSteps.includes(s.stepNumber)).length;
 
-              // Find milestone for this phase
-              const milestone = milestones[phaseIndex] || null;
+              // Find milestone for this phase: match by skill intersection first, then sequence index
+              const phaseSkillNames = new Set(phaseSteps.flatMap((s) => s.skills.map((k) => k.toLowerCase())));
+              const milestone =
+                milestones.find((m) =>
+                  m.skillsTested.some((st) => phaseSkillNames.has(st.toLowerCase()))
+                ) || milestones[phaseIndex] || null;
 
               let milestoneState: "NOT_STARTED" | "IN_PROGRESS" | "READY_FOR_ASSESSMENT" | "ASSESSMENT_COMPLETED" = "NOT_STARTED";
               if (milestone) {
@@ -265,6 +279,7 @@ export function AiRoadmap() {
                           step={step}
                           isCompleted={isCompleted}
                           onToggleCompletion={() => toggleStepCompletion(step.stepNumber)}
+                          demoSkillsMap={demoSkillsMap}
                         />
                       );
                     })}
@@ -275,6 +290,8 @@ export function AiRoadmap() {
                     <MilestoneCheckpointCard
                       milestone={milestone}
                       milestoneState={milestoneState}
+                      phaseCompletedCount={phaseCompletedCount}
+                      totalPhaseSteps={phaseSteps.length}
                     />
                   )}
 
@@ -299,9 +316,13 @@ export function AiRoadmap() {
 function MilestoneCheckpointCard({
   milestone,
   milestoneState,
+  phaseCompletedCount,
+  totalPhaseSteps,
 }: {
   milestone: MilestoneAssessmentItem;
   milestoneState: "NOT_STARTED" | "IN_PROGRESS" | "READY_FOR_ASSESSMENT" | "ASSESSMENT_COMPLETED";
+  phaseCompletedCount: number;
+  totalPhaseSteps: number;
 }) {
   return (
     <article className="mt-6 rounded-2xl border border-[var(--jl-primary)]/40 bg-[var(--jl-surface)] p-5 shadow-card sm:p-6 space-y-4">
@@ -315,13 +336,17 @@ function MilestoneCheckpointCard({
               milestoneState === "ASSESSMENT_COMPLETED"
                 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
                 : milestoneState === "READY_FOR_ASSESSMENT"
-                ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 animate-pulse"
                 : milestoneState === "IN_PROGRESS"
                 ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
                 : "bg-[var(--jl-surface-muted)] text-[var(--jl-text-muted)]"
             }`}
           >
-            {milestoneState.replace(/_/g, " ")}
+            {milestoneState === "READY_FOR_ASSESSMENT"
+              ? "🎯 Ready for Assessment"
+              : milestoneState === "IN_PROGRESS"
+              ? `Learning in Progress (${phaseCompletedCount}/${totalPhaseSteps} steps)`
+              : milestoneState.replace(/_/g, " ")}
           </span>
         </div>
 
@@ -339,6 +364,26 @@ function MilestoneCheckpointCard({
           {milestone.description}
         </p>
       </div>
+
+      {milestoneState === "READY_FOR_ASSESSMENT" && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 flex items-center justify-between text-xs dark:border-amber-900 dark:bg-amber-950/30">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🔓</span>
+            <span className="font-bold text-amber-900 dark:text-amber-200">
+              Phase learning complete! Take this checkpoint to evaluate your skills and update your Skill Gap.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {milestoneState === "IN_PROGRESS" && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3 flex items-center gap-2 text-xs dark:border-blue-900 dark:bg-blue-950/30">
+          <span className="text-base">📚</span>
+          <span className="text-blue-900 dark:text-blue-200">
+            Complete all {totalPhaseSteps} learning steps in this phase to prepare for this checkpoint assessment.
+          </span>
+        </div>
+      )}
 
       {milestoneState === "ASSESSMENT_COMPLETED" && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 flex items-center justify-between text-xs dark:border-emerald-900 dark:bg-emerald-950/30">
@@ -391,10 +436,12 @@ function StepCard({
   step,
   isCompleted,
   onToggleCompletion,
+  demoSkillsMap,
 }: {
   step: RoadmapStep;
   isCompleted: boolean;
   onToggleCompletion: () => void;
+  demoSkillsMap?: Map<string, { demonstratedLevel: number | null; levelLabel: string | null; percentage: number | null }>;
 }) {
   const stepLabel = `STEP ${String(step.stepNumber).padStart(2, "0")}`;
 
@@ -432,7 +479,7 @@ function StepCard({
             </span>
             {isCompleted && (
               <span className="rounded-md bg-[var(--jl-surface-muted)] px-2 py-0.5 text-[11px] font-bold text-[var(--jl-success)]">
-                ✓ Completed
+                ✓ Learning Completed
               </span>
             )}
           </div>
@@ -459,15 +506,29 @@ function StepCard({
         <p className="text-sm leading-relaxed text-[var(--jl-text)]">{step.description}</p>
         {step.skills && step.skills.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-bold text-[var(--jl-text-muted)]">Skills:</span>
-            {step.skills.map((skill) => (
-              <span
-                key={skill}
-                className="rounded-lg border border-[var(--jl-border)] bg-[var(--jl-canvas-soft)] px-2.5 py-0.5 text-xs font-medium text-[var(--jl-text)]"
-              >
-                {skill}
-              </span>
-            ))}
+            <span className="text-xs font-bold text-[var(--jl-text-muted)]">Skills Covered:</span>
+            {step.skills.map((skill) => {
+              const demo = demoSkillsMap?.get(skill.toLowerCase());
+              return (
+                <span
+                  key={skill}
+                  className={`rounded-lg border px-2.5 py-0.5 text-xs font-medium inline-flex items-center gap-1.5 ${
+                    demo && demo.demonstratedLevel && demo.demonstratedLevel >= 3
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+                      : demo && demo.demonstratedLevel
+                      ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
+                      : "border-[var(--jl-border)] bg-[var(--jl-canvas-soft)] text-[var(--jl-text)]"
+                  }`}
+                >
+                  <span>{skill}</span>
+                  {demo && demo.demonstratedLevel ? (
+                    <span className="text-[10px] font-bold opacity-85">
+                      · L{demo.demonstratedLevel} ({demo.levelLabel})
+                    </span>
+                  ) : null}
+                </span>
+              );
+            })}
           </div>
         )}
       </div>
@@ -502,93 +563,83 @@ function StepCard({
           </div>
         </div>
 
-        {/* Extra Documentation & Resources */}
+        {/* Official Docs & Reading Resources */}
         <div className="rounded-xl border border-[var(--jl-border)] bg-[var(--jl-surface-muted)] p-4">
           <div className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-[var(--jl-text)]">
-            <span>📚</span>
-            <span>Extra Resources & Docs</span>
+            <span>📖</span>
+            <span>Official Docs & Articles</span>
           </div>
 
           <div className="mt-3 space-y-2.5">
             {step.extraResources && step.extraResources.length > 0 ? (
-              step.extraResources.map((res, eIdx) => (
-                <ExtraResourceCard key={eIdx} resource={res} />
+              step.extraResources.map((res, rIdx) => (
+                <ExtraResourceCard key={rIdx} resource={res} />
               ))
             ) : (
-              <p className="text-xs text-[var(--jl-text-muted)]">No extra resources linked.</p>
+              <p className="text-xs text-[var(--jl-text-muted)]">No official docs linked.</p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Practice / Project Section */}
-      <div className="mt-4 rounded-xl border border-[var(--jl-border)] bg-[var(--jl-surface)] p-4">
-        <div className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-[var(--jl-text)]">
-          <span>🛠️</span>
-          <span>Hands-On Practice</span>
+      {/* Practice Project Idea */}
+      {step.practiceIdea && (
+        <div className="mt-4 rounded-xl border border-[var(--jl-border)] bg-[var(--jl-surface-muted)] p-4">
+          <div className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-[var(--jl-text)]">
+            <span>🛠️</span>
+            <span>Hands-on Practice Idea</span>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-[var(--jl-text)] sm:text-sm">
+            {step.practiceIdea}
+          </p>
         </div>
-        <p className="mt-1.5 text-xs leading-relaxed text-[var(--jl-text)] sm:text-sm">
-          {step.practiceIdea}
-        </p>
-
-        {/* Prerequisites Footer */}
-        <div className="mt-3 border-t border-[var(--jl-border)] pt-2.5 text-xs text-[var(--jl-text-muted)]">
-          <strong className="font-semibold text-[var(--jl-text)]">Prerequisites:</strong>{" "}
-          {step.prerequisites && step.prerequisites.length > 0
-            ? step.prerequisites.join(" • ")
-            : "None (Beginner ready)"}
-        </div>
-      </div>
+      )}
     </article>
   );
 }
 
 function VideoCard({ video }: { video: VideoResource }) {
   return (
-    <div className="flex flex-col justify-between gap-2 rounded-lg border border-[var(--jl-border)] bg-[var(--jl-surface)] p-3 sm:flex-row sm:items-center">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-bold text-[var(--jl-text)]" title={video.title}>
+    <a
+      href={video.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group block rounded-lg border border-[var(--jl-border)] bg-[var(--jl-surface)] p-3 transition hover:border-[var(--jl-primary)] hover:shadow-sm"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h5 className="text-xs font-bold text-[var(--jl-text)] transition group-hover:text-[var(--jl-primary)] sm:text-sm">
           {video.title}
-        </p>
-        <p className="text-[11px] text-[var(--jl-text-muted)]">{video.channel}</p>
+        </h5>
+        <span className="shrink-0 text-xs text-[var(--jl-text-muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--jl-primary)]">
+          ↗
+        </span>
       </div>
-      <a
-        href={video.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-[var(--jl-border)] bg-[var(--jl-canvas-soft)] px-2.5 py-1.5 text-xs font-semibold text-[var(--jl-text)] transition hover:border-[var(--jl-primary)] hover:bg-[var(--jl-surface-muted)]"
-      >
-        <span>Watch on YouTube</span>
-        <span aria-hidden="true">↗</span>
-      </a>
-    </div>
+      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--jl-text-muted)]">
+        {video.channel && <span className="font-semibold text-[var(--jl-text)]">{video.channel}</span>}
+      </div>
+    </a>
   );
 }
 
 function ExtraResourceCard({ resource }: { resource: ExtraResource }) {
   return (
-    <div className="flex flex-col justify-between gap-2 rounded-lg border border-[var(--jl-border)] bg-[var(--jl-surface)] p-3 sm:flex-row sm:items-center">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <p className="truncate text-xs font-bold text-[var(--jl-text)]" title={resource.title}>
-            {resource.title}
-          </p>
-          {resource.type && (
-            <span className="rounded border border-[var(--jl-border)] bg-[var(--jl-canvas-soft)] px-1.5 py-0.2 text-[10px] uppercase text-[var(--jl-text-muted)]">
-              {resource.type}
-            </span>
-          )}
-        </div>
+    <a
+      href={resource.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group block rounded-lg border border-[var(--jl-border)] bg-[var(--jl-surface)] p-3 transition hover:border-[var(--jl-primary)] hover:shadow-sm"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <h5 className="text-xs font-bold text-[var(--jl-text)] transition group-hover:text-[var(--jl-primary)] sm:text-sm">
+          {resource.title}
+        </h5>
+        <span className="shrink-0 text-xs text-[var(--jl-text-muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--jl-primary)]">
+          ↗
+        </span>
       </div>
-      <a
-        href={resource.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-[var(--jl-border)] bg-[var(--jl-canvas-soft)] px-2.5 py-1.5 text-xs font-semibold text-[var(--jl-text)] transition hover:border-[var(--jl-primary)] hover:bg-[var(--jl-surface-muted)]"
-      >
-        <span>Open Doc</span>
-        <span aria-hidden="true">↗</span>
-      </a>
-    </div>
+      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--jl-text-muted)]">
+        {resource.type && <span className="capitalize">{resource.type}</span>}
+      </div>
+    </a>
   );
 }
