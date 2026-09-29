@@ -440,6 +440,12 @@ export type MilestoneAssessmentItem = {
   latestScore: number | null;
   latestPercentage: number | null;
   completedAt: Date | string | null;
+  skillsWithDemonstrated?: {
+    skillName: string;
+    demonstratedLevel: number | null;
+    levelLabel: string | null;
+    percentage: number | null;
+  }[];
 };
 
 export async function getMilestoneAssessmentsForUser(userId: number, jobRoleId: number): Promise<MilestoneAssessmentItem[]> {
@@ -506,6 +512,9 @@ export async function getMilestoneAssessmentsForUser(userId: number, jobRoleId: 
     }
   }
 
+  const demoSkills = await getLatestDemonstratedSkills(userId);
+  const demoMap = new Map(demoSkills.map((d) => [d.skillName.toLowerCase(), d]));
+
   return assResult.rows.map((a) => {
     const att = attemptsMap.get(a.id);
     let status: "not_started" | "in_progress" | "completed" = "not_started";
@@ -514,6 +523,17 @@ export async function getMilestoneAssessmentsForUser(userId: number, jobRoleId: 
       else if (att.status === "in_progress") status = "in_progress";
     }
 
+    const tested = skillsMap.get(a.id) ?? [];
+    const skillsWithDemonstrated = tested.map((name) => {
+      const d = demoMap.get(name.toLowerCase());
+      return {
+        skillName: name,
+        demonstratedLevel: d ? d.demonstratedLevel : null,
+        levelLabel: d ? d.levelLabel : null,
+        percentage: d ? d.percentage : null,
+      };
+    });
+
     return {
       id: a.id,
       title: a.title,
@@ -521,12 +541,13 @@ export async function getMilestoneAssessmentsForUser(userId: number, jobRoleId: 
       durationMinutes: a.duration_minutes,
       totalQuestions: a.total_questions,
       passingScore: a.passing_score,
-      skillsTested: skillsMap.get(a.id) ?? [],
+      skillsTested: tested,
       status,
       latestAttemptId: att ? att.id : null,
       latestScore: att ? att.score : null,
       latestPercentage: att ? att.percentage : null,
       completedAt: att ? att.completedAt : null,
+      skillsWithDemonstrated,
     };
   });
 }
