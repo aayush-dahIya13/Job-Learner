@@ -1,10 +1,25 @@
 import { NextResponse } from "next/server";
 import { currentUserId } from "@/lib/auth";
 import { submitAssessmentAttempt } from "@/lib/student-assessment";
+import {
+  checkRateLimit,
+  getClientIp,
+  createRateLimitResponse,
+  RATE_LIMIT_PRESETS,
+} from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const clientIp = getClientIp(req);
+  const rateLimitResult = checkRateLimit(
+    `assessment:submit:${userId || clientIp}`,
+    RATE_LIMIT_PRESETS.ASSESSMENT_ACTION
+  );
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
 
   try {
     const body = await req.json();

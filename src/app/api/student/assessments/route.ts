@@ -6,6 +6,12 @@ import {
   getActiveStudentAttempt,
   startAssessmentAttempt,
 } from "@/lib/student-assessment";
+import {
+  checkRateLimit,
+  getClientIp,
+  createRateLimitResponse,
+  RATE_LIMIT_PRESETS,
+} from "@/lib/rate-limit";
 
 export async function GET() {
   const userId = await currentUserId();
@@ -75,6 +81,15 @@ export async function GET() {
 export async function POST(req: Request) {
   const userId = await currentUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const clientIp = getClientIp(req);
+  const rateLimitResult = checkRateLimit(
+    `assessment:start:${userId || clientIp}`,
+    RATE_LIMIT_PRESETS.ASSESSMENT_ACTION
+  );
+  if (!rateLimitResult.success) {
+    return createRateLimitResponse(rateLimitResult);
+  }
 
   const body = await req.json().catch(() => ({}));
   let assessmentId = Number(body.assessmentId);

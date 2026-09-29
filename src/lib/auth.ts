@@ -52,3 +52,35 @@ export async function requireAdmin() {
   if (result.rows[0]?.role !== "admin") redirect("/dashboard");
   return userId;
 }
+
+export type ApiAuthResult =
+  | { success: true; userId: number }
+  | { success: false; response: import("next/server").NextResponse };
+
+export async function requireApiUser(): Promise<ApiAuthResult> {
+  const { NextResponse } = await import("next/server");
+  const userId = await currentUserId();
+  if (!userId) {
+    return {
+      success: false,
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
+  }
+  return { success: true, userId };
+}
+
+export async function requireApiAdmin(): Promise<ApiAuthResult> {
+  const { NextResponse } = await import("next/server");
+  const userAuth = await requireApiUser();
+  if (!userAuth.success) return userAuth;
+
+  const result = await query<{ role: string }>("SELECT role FROM users WHERE id = $1", [userAuth.userId]);
+  if (result.rows[0]?.role !== "admin") {
+    return {
+      success: false,
+      response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+    };
+  }
+  return { success: true, userId: userAuth.userId };
+}
+
