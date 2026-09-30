@@ -1,15 +1,20 @@
 import Link from "next/link";
 import { requireUserId } from "@/lib/auth";
 import { getStudentSkillGap } from "@/lib/student-skill-gap";
+import { getLatestCompletedAssessment } from "@/lib/student-assessment";
 import { CareerGoalSelector } from "@/components/career-goal-selector";
 import { StudentSkillsManager } from "@/components/student-skills-manager";
 import { SkillProgressView } from "@/components/skill-progress-view";
+import { AssessmentEvidenceCard } from "@/components/assessment-evidence-card";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { formatDate, formatDateShort } from "@/lib/date";
 
 export default async function SkillGapPage() {
   const id = await requireUserId();
-  const gap = await getStudentSkillGap(id);
+  const [gap, latestAssessment] = await Promise.all([
+    getStudentSkillGap(id),
+    getLatestCompletedAssessment(id),
+  ]);
 
   return (
     <DashboardShell
@@ -63,6 +68,10 @@ export default async function SkillGapPage() {
               </article>
             ))}
           </section>
+
+          {/* Assessment Evidence Section */}
+          <AssessmentEvidenceCard assessment={latestAssessment} />
+
 
           {/* SECTION 1: ASSESSMENT-DRIVEN SKILL GAP */}
           <section className="surface mt-8 p-5 sm:p-6 space-y-6">
