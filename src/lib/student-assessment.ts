@@ -668,3 +668,95 @@ export async function getSkillProgressHistory(userId: number): Promise<SkillProg
 
   return result;
 }
+
+export type LatestCompletedAssessmentSkill = {
+  skillId: number;
+  skillName: string;
+  score: number;
+  percentage: number;
+  demonstratedLevel: number;
+  levelLabel: DemonstratedLevelLabel;
+  questionsAttempted: number;
+  questionsCorrect: number;
+};
+
+export type LatestCompletedAssessment = {
+  attemptId: number;
+  assessmentId: number;
+  title: string;
+  assessmentType: string;
+  completedAt: Date | string;
+  score: number;
+  percentage: number;
+  attemptNumber: number;
+  skillsCount: number;
+  skills: LatestCompletedAssessmentSkill[];
+};
+
+export async function getLatestCompletedAssessment(userId: number): Promise<LatestCompletedAssessment | null> {
+  const latestAttemptRes = await query<{
+    id: number;
+    assessment_id: number;
+    assessment_title: string;
+    assessment_type: string;
+    completed_at: Date | null;
+    score: string | null;
+    percentage: string | null;
+    attempt_number: number;
+  }>(
+    `SELECT aa.id::integer AS id, aa.assessment_id::integer AS assessment_id, a.title AS assessment_title,
+            a.assessment_type, aa.completed_at, aa.score::text, aa.percentage::text, aa.attempt_number
+     FROM assessment_attempts aa
+     JOIN assessments a ON a.id = aa.assessment_id
+     WHERE aa.user_id = $1 AND aa.status = 'completed'
+     ORDER BY aa.completed_at DESC NULLS LAST, aa.id DESC LIMIT 1`,
+    [userId]
+  );
+
+  const attempt = latestAttemptRes.rows[0];
+  if (!attempt || !attempt.completed_at) return null;
+
+  const skillRes = await query<{
+    skill_id: number;
+    skill_name: string;
+    score: string;
+    percentage: string;
+    demonstrated_level: number;
+    questions_attempted: number;
+    questions_correct: number;
+  }>(
+    `SELECT sar.skill_id::integer AS skill_id, s.name AS skill_name, sar.score::text, sar.percentage::text,
+            sar.demonstrated_level, sar.questions_attempted, sar.questions_correct
+     FROM skill_assessment_results sar
+     JOIN skills s ON s.id = sar.skill_id
+     WHERE sar.attempt_id = $1
+     ORDER BY s.name ASC`,
+    [attempt.id]
+  );
+
+  return {
+    attemptId: attempt.id,
+    assessmentId: attempt.assessment_id,
+    title: attempt.assessment_title,
+    assessmentType: attempt.assessment_type,
+    completedAt: attempt.completed_at,
+    score: attempt.score !== null ? Number(attempt.score) : 0,
+    percentage: attempt.percentage !== null ? Number(attempt.percentage) : 0,
+    attemptNumber: attempt.attempt_number,
+    skillsCount: skillRes.rows.length,
+    skills: skillRes.rows.map((sr) => {
+      const pct = Number(sr.percentage);
+      return {
+        skillId: sr.skill_id,
+        skillName: sr.skill_name,
+        score: Number(sr.score),
+        percentage: pct,
+        demonstratedLevel: sr.demonstrated_level,
+        levelLabel: getDemonstratedLevelLabel(pct),
+        questionsAttempted: sr.questions_attempted,
+        questionsCorrect: sr.questions_correct,
+      };
+    }),
+  };
+}
+
