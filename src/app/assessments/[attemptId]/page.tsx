@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/auth";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { getAttemptDetails } from "@/lib/student-assessment";
+import { latestRoadmap } from "@/lib/ai/store";
 import { AssessmentResult } from "@/components/assessment-result";
 
 export default async function AssessmentResultPage({
@@ -15,12 +16,17 @@ export default async function AssessmentResultPage({
 
   if (!attemptId) notFound();
 
-  const details = await getAttemptDetails(userId, attemptId);
+  const [details, roadmap] = await Promise.all([
+    getAttemptDetails(userId, attemptId),
+    latestRoadmap(userId),
+  ]);
+
   if (!details) notFound();
 
   return (
     <DashboardShell title="Diagnostic Assessment Results" description="Detailed breakdown of demonstrated technical performance.">
-      <AssessmentResult details={details} />
+      <AssessmentResult details={details} roadmap={roadmap} />
     </DashboardShell>
   );
 }
+
