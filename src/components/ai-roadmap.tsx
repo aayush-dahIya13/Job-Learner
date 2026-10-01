@@ -55,6 +55,27 @@ export function AiRoadmap() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!loading && data) {
+      const hash = typeof window !== "undefined" ? window.location.hash : "";
+      if (hash && hash.startsWith("#step-")) {
+        const stepId = hash.slice(1);
+        const timer = setTimeout(() => {
+          const el = document.getElementById(stepId);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.classList.add("ring-2", "ring-primary", "ring-offset-2");
+            setTimeout(() => {
+              el.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+            }, 3000);
+          }
+        }, 120);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [loading, data]);
+
+
   const toggleStepCompletion = async (stepNumber: number) => {
     const isCompletedNow = !completedSteps.includes(stepNumber);
     const nextSteps = isCompletedNow
@@ -461,7 +482,8 @@ function StepCard({
 
   return (
     <article
-      className={`rounded-2xl border transition-all duration-200 shadow-card ${
+      id={`step-${step.stepNumber}`}
+      className={`rounded-2xl border transition-all duration-200 shadow-card scroll-mt-24 ${
         isCompleted
           ? "border-[var(--jl-primary)] bg-[var(--jl-surface)] opacity-95"
           : "border-[var(--jl-border)] bg-[var(--jl-surface)]"
