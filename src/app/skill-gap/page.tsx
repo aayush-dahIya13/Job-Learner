@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireUserId } from "@/lib/auth";
-import { getStudentSkillGap } from "@/lib/student-skill-gap";
+import { getStudentSkillGap, findMatchingRoadmapSteps } from "@/lib/student-skill-gap";
 import { getLatestCompletedAssessment } from "@/lib/student-assessment";
+import { latestRoadmap } from "@/lib/ai/store";
 import { CareerGoalSelector } from "@/components/career-goal-selector";
 import { StudentSkillsManager } from "@/components/student-skills-manager";
 import { SkillProgressView } from "@/components/skill-progress-view";
@@ -11,10 +12,12 @@ import { formatDate, formatDateShort } from "@/lib/date";
 
 export default async function SkillGapPage() {
   const id = await requireUserId();
-  const [gap, latestAssessment] = await Promise.all([
+  const [gap, latestAssessment, roadmap] = await Promise.all([
     getStudentSkillGap(id),
     getLatestCompletedAssessment(id),
+    latestRoadmap(id),
   ]);
+
 
   return (
     <DashboardShell
@@ -119,56 +122,98 @@ export default async function SkillGapPage() {
             {/* Weak Skills Cards */}
             {gap.assessmentWeakSkills.length > 0 && (
               <div className="grid gap-4 md:grid-cols-2">
-                {gap.assessmentWeakSkills.map((weak) => (
-                  <article
-                    key={weak.skillId}
-                    className={`rounded-xl border p-4 space-y-3 transition-all ${
-                      weak.isHighPriority
-                        ? "border-rose-300 bg-rose-50/50 dark:border-rose-900/60 dark:bg-rose-950/20"
-                        : "border-amber-200 bg-amber-50/40 dark:border-amber-900/60 dark:bg-amber-950/20"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h4 className="font-bold text-base text-stone-900 dark:text-stone-100 flex items-center gap-2">
-                          {weak.skillName}
-                        </h4>
-                        <p className="text-xs text-stone-500 mt-0.5">
-                          Assessed on {formatDate(weak.completedAt)}
-                        </p>
+                {gap.assessmentWeakSkills.map((weak) => {
+                  const matchingSteps = findMatchingRoadmapSteps(weak.skillName, roadmap?.phases);
+                  return (
+                    <article
+                      key={weak.skillId}
+                      className={`rounded-xl border p-4 space-y-3 transition-all ${
+                        weak.isHighPriority
+                          ? "border-rose-300 bg-rose-50/50 dark:border-rose-900/60 dark:bg-rose-950/20"
+                          : "border-amber-200 bg-amber-50/40 dark:border-amber-900/60 dark:bg-amber-950/20"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="font-bold text-base text-stone-900 dark:text-stone-100 flex items-center gap-2">
+                            {weak.skillName}
+                          </h4>
+                          <p className="text-xs text-stone-500 mt-0.5">
+                            Assessed on {formatDate(weak.completedAt)}
+                          </p>
+                        </div>
+
+                        {weak.isHighPriority ? (
+                          <span className="rounded-full bg-rose-600 text-white px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider shrink-0 shadow-xs animate-pulse">
+                            🔥 HIGH PRIORITY
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider shrink-0">
+                            Development Area
+                          </span>
+                        )}
                       </div>
 
-                      {weak.isHighPriority ? (
-                        <span className="rounded-full bg-rose-600 text-white px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider shrink-0 shadow-xs animate-pulse">
-                          🔥 HIGH PRIORITY
+                      <div className="flex items-center justify-between text-xs font-semibold pt-1 border-t border-stone-200/60 dark:border-stone-800">
+                        <span className="text-stone-600 dark:text-stone-400">Demonstrated Score:</span>
+                        <span className="text-stone-900 dark:text-stone-100 font-bold">
+                          {weak.score}% · {weak.label} (Level {weak.level}/5)
                         </span>
-                      ) : (
-                        <span className="rounded-full bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider shrink-0">
-                          Development Area
-                        </span>
-                      )}
-                    </div>
+                      </div>
 
-                    <div className="flex items-center justify-between text-xs font-semibold pt-1 border-t border-stone-200/60 dark:border-stone-800">
-                      <span className="text-stone-600 dark:text-stone-400">Demonstrated Score:</span>
-                      <span className="text-stone-900 dark:text-stone-100 font-bold">
-                        {weak.score}% · {weak.label} (Level {weak.level}/5)
-                      </span>
-                    </div>
+                      <div className="text-xs text-stone-600 dark:text-stone-400">
+                        {weak.isHighPriority ? (
+                          <p className="text-rose-800 dark:text-rose-300 font-medium">
+                            ⚠️ Required for your target job role <strong>({gap.jobRole.title})</strong> and assessed below proficient.
+                          </p>
+                        ) : (
+                          <p className="text-stone-500">
+                            ℹ️ Assessed below proficient, but not currently required for target role.
+                          </p>
+                        )}
+                      </div>
 
-                    <div className="text-xs text-stone-600 dark:text-stone-400">
-                      {weak.isHighPriority ? (
-                        <p className="text-rose-800 dark:text-rose-300 font-medium">
-                          ⚠️ Required for your target job role <strong>({gap.jobRole.title})</strong> and assessed below proficient.
-                        </p>
-                      ) : (
-                        <p className="text-stone-500">
-                          ℹ️ Assessed below proficient, but not currently required for target role.
-                        </p>
-                      )}
-                    </div>
-                  </article>
-                ))}
+                      {/* Recommended Learning Action */}
+                      <div className="pt-2.5 border-t border-stone-200/60 dark:border-stone-800 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-stone-700 dark:text-stone-300 flex items-center gap-1.5">
+                            <span>📖</span> Recommended Learning:
+                          </span>
+                          {matchingSteps.length > 0 ? (
+                            <Link
+                              href={`/roadmap#step-${matchingSteps[0].stepNumber}`}
+                              className="font-semibold text-primary hover:underline inline-flex items-center gap-0.5"
+                            >
+                              <span>View Learning Step{matchingSteps.length > 1 ? `s (${matchingSteps.length})` : ""}</span>
+                              <span>→</span>
+                            </Link>
+                          ) : null}
+                        </div>
+
+                        {matchingSteps.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            {matchingSteps.map((step) => (
+                              <Link
+                                key={step.stepNumber}
+                                href={`/roadmap#step-${step.stepNumber}`}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200/90 dark:border-stone-700 bg-stone-50/80 dark:bg-stone-900/60 px-2.5 py-1 text-xs font-medium text-stone-800 dark:text-stone-200 hover:border-primary hover:text-primary transition shadow-xs"
+                                title={`Jump to Step ${step.stepNumber}: ${step.title}`}
+                              >
+                                <span className="font-bold text-primary">Step {step.stepNumber}:</span>
+                                <span className="truncate max-w-[200px]">{step.title}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[11px] italic text-stone-500 dark:text-stone-400">
+                            No mapped learning step yet
+                          </p>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+
               </div>
             )}
           </section>
