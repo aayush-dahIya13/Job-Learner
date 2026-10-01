@@ -7,6 +7,8 @@ import {
   type DemonstratedSkillAttempt,
 } from "../proficiency";
 import { calculateSkillGap } from "../skill-gap";
+import { findMatchingRoadmapSteps } from "../student-skill-gap";
+
 
 describe("Adaptive Learning ↔ Assessment Loop Integration", () => {
   // Test 1: Completing learning does not increase demonstrated proficiency
@@ -269,4 +271,79 @@ describe("Adaptive Learning ↔ Assessment Loop Integration", () => {
     const authenticatedAdmin = { id: 1, role: "admin" };
     expect(authenticatedAdmin.role).toBe("admin");
   });
+
+  // Test 11: Weak skill correctly maps to corresponding roadmap learning steps
+  it("11. findMatchingRoadmapSteps maps weak skills to existing roadmap steps by skill coverage", () => {
+    const phases = [
+      {
+        phase: 1,
+        steps: [
+          { stepNumber: 1, title: "Modern JavaScript & DOM", skills: ["JavaScript", "DOM"] },
+          { stepNumber: 2, title: "TypeScript Core Concepts", skills: ["TypeScript", "JavaScript"] },
+        ],
+      },
+      {
+        phase: 2,
+        steps: [
+          { stepNumber: 3, title: "React Component Architecture", skills: ["React", "TypeScript"] },
+          { stepNumber: 4, title: "Backend with Node & Express", skills: ["Node.js", "Express.js"] },
+        ],
+      },
+    ];
+
+    // Weak Skill: TypeScript -> matches Step 2 and Step 3
+    const tsMatches = findMatchingRoadmapSteps("TypeScript", phases);
+    expect(tsMatches).toHaveLength(2);
+    expect(tsMatches[0]).toEqual({ stepNumber: 2, title: "TypeScript Core Concepts", phaseNumber: 1 });
+    expect(tsMatches[1]).toEqual({ stepNumber: 3, title: "React Component Architecture", phaseNumber: 2 });
+
+    // Weak Skill: Node.js (case-insensitive) -> matches Step 4
+    const nodeMatches = findMatchingRoadmapSteps("node.js", phases);
+    expect(nodeMatches).toHaveLength(1);
+    expect(nodeMatches[0].stepNumber).toBe(4);
+
+    // Unmapped Skill: Docker -> returns empty array
+    const unmappedMatches = findMatchingRoadmapSteps("Docker", phases);
+    expect(unmappedMatches).toEqual([]);
+
+    // Null or empty phases -> returns empty array
+    expect(findMatchingRoadmapSteps("React", null)).toEqual([]);
+    expect(findMatchingRoadmapSteps("", phases)).toEqual([]);
+  });
+
+  // Test 12: Assessment results selects 2-3 weakest skills and maps to roadmap steps
+  it("12. assessment results selects top 2-3 weakest skills and resolves roadmap learning actions", () => {
+    const skillResults = [
+      { skillId: 1, skillName: "React", score: 85, percentage: 85, demonstratedLevel: 4, levelLabel: "Advanced" as const, questionsAttempted: 10, questionsCorrect: 8, selfReportedLevel: 4 },
+      { skillId: 2, skillName: "TypeScript", score: 40, percentage: 40, demonstratedLevel: 2, levelLabel: "Developing" as const, questionsAttempted: 10, questionsCorrect: 4, selfReportedLevel: 3 },
+      { skillId: 3, skillName: "Node.js", score: 55, percentage: 55, demonstratedLevel: 2, levelLabel: "Developing" as const, questionsAttempted: 10, questionsCorrect: 5, selfReportedLevel: 2 },
+      { skillId: 4, skillName: "SQL", score: 90, percentage: 90, demonstratedLevel: 5, levelLabel: "Expert" as const, questionsAttempted: 10, questionsCorrect: 9, selfReportedLevel: 5 },
+      { skillId: 5, skillName: "CSS", score: 65, percentage: 65, demonstratedLevel: 3, levelLabel: "Proficient" as const, questionsAttempted: 10, questionsCorrect: 6, selfReportedLevel: 3 },
+    ];
+
+    // Sort skills by percentage ascending, then demonstratedLevel ascending
+    const sorted = [...skillResults].sort((a, b) => a.percentage - b.percentage || a.demonstratedLevel - b.demonstratedLevel);
+    const topWeakest = sorted.slice(0, 3);
+
+    // Top 3 weakest skills selected
+    expect(topWeakest).toHaveLength(3);
+    expect(topWeakest[0].skillName).toBe("TypeScript"); // 40%
+    expect(topWeakest[1].skillName).toBe("Node.js");    // 55%
+    expect(topWeakest[2].skillName).toBe("CSS");        // 65%
+
+
+    // Verify roadmap mapping for the weakest skill
+    const dummyPhases = [
+      { phase: 1, steps: [{ stepNumber: 2, title: "TypeScript Deep Dive", skills: ["TypeScript"] }] },
+    ];
+    const tsMap = findMatchingRoadmapSteps(topWeakest[0].skillName, dummyPhases);
+    expect(tsMap).toHaveLength(1);
+    expect(tsMap[0].stepNumber).toBe(2);
+
+    // Verify unmapped fallback behavior
+    const unmappedMap = findMatchingRoadmapSteps("NonExistentSkill", dummyPhases);
+    expect(unmappedMap).toHaveLength(0);
+  });
 });
+
+
