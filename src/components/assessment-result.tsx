@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/date";
 import type { SkillAssessmentResult } from "@/lib/student-assessment";
+import { findMatchingRoadmapSteps } from "@/lib/student-skill-gap";
+import type { RoadmapPhase } from "@/lib/ai/schemas";
 
 type AssessmentResultProps = {
   details: {
@@ -14,11 +16,20 @@ type AssessmentResultProps = {
     attemptNumber: number;
     skillResults: (SkillAssessmentResult & { selfReportedLevel: number | null })[];
   };
+  roadmap?: {
+    phases: RoadmapPhase[];
+  } | null;
 };
 
-export function AssessmentResult({ details }: AssessmentResultProps) {
+export function AssessmentResult({ details, roadmap }: AssessmentResultProps) {
   const percentage = details.percentage ?? 0;
   const weakSkills = details.skillResults.filter((s) => s.percentage < 70);
+
+  // Identify the 2–3 weakest assessed skills using existing assessment results
+  const sortedSkills = [...details.skillResults].sort(
+    (a, b) => a.percentage - b.percentage || a.demonstratedLevel - b.demonstratedLevel
+  );
+  const topWeakest = sortedSkills.slice(0, 3);
 
   const levelBadgeClass = (label: string) => {
     switch (label) {
@@ -58,6 +69,96 @@ export function AssessmentResult({ details }: AssessmentResultProps) {
           </div>
         </div>
       </section>
+
+      {/* WHAT TO WORK ON NEXT SECTION */}
+      {topWeakest.length > 0 && (
+        <section className="dashboard-card p-6 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-4 dark:border-stone-800">
+            <div>
+              <span className="eyebrow text-primary">Targeted Action Plan</span>
+              <h2 className="mt-1 text-xl font-bold">What to Work on Next</h2>
+              <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">
+                Recommended learning actions based on your lowest demonstrated assessment scores.
+              </p>
+            </div>
+            <span className="rounded-full bg-amber-100 dark:bg-amber-950/60 px-3 py-1 text-xs font-bold text-amber-800 dark:text-amber-300">
+              {topWeakest.length} Priority Area{topWeakest.length === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {topWeakest.map((skill) => {
+              const matchingSteps = findMatchingRoadmapSteps(skill.skillName, roadmap?.phases);
+              return (
+                <article
+                  key={skill.skillId}
+                  className="rounded-xl border border-stone-200 dark:border-stone-800 p-4 bg-surface space-y-3 flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-bold text-base text-stone-900 dark:text-stone-100 truncate" title={skill.skillName}>
+                        {skill.skillName}
+                      </h3>
+                      <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 px-2.5 py-0.5 text-[11px] font-bold shrink-0">
+                        Needs Improvement
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-stone-600 dark:text-stone-400 pt-1">
+                      <span>Demonstrated Score:</span>
+                      <span className="font-bold text-stone-900 dark:text-stone-100">
+                        {skill.percentage}% · Level {skill.demonstratedLevel}/5 ({skill.levelLabel})
+                      </span>
+                    </div>
+
+                    {/* Mini Progress Bar */}
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          skill.percentage >= 60 ? "bg-amber-500" : "bg-rose-500"
+                        }`}
+                        style={{ width: `${skill.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2.5 border-t border-stone-200/60 dark:border-stone-800 space-y-2">
+                    {matchingSteps.length > 0 ? (
+                      <>
+                        <Link
+                          href={`/roadmap#step-${matchingSteps[0].stepNumber}`}
+                          className="btn-primary w-full text-center text-xs py-2 inline-flex items-center justify-center gap-1 font-bold"
+                        >
+                          <span>Start Learning (Step {matchingSteps[0].stepNumber})</span>
+                          <span>→</span>
+                        </Link>
+                        {matchingSteps.length > 1 && (
+                          <div className="flex flex-wrap gap-1 text-[11px] pt-0.5">
+                            {matchingSteps.map((step) => (
+                              <Link
+                                key={step.stepNumber}
+                                href={`/roadmap#step-${step.stepNumber}`}
+                                className="rounded border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900 px-2 py-0.5 text-stone-700 dark:text-stone-300 hover:border-primary hover:text-primary transition"
+                              >
+                                Step {step.stepNumber}: {step.title}
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs italic text-stone-500 dark:text-stone-400 text-center py-1">
+                        No mapped learning step yet
+                      </p>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
 
       {/* Main Breakdown Section */}
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
