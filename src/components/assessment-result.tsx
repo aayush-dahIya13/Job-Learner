@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/date";
 import type { SkillAssessmentResult } from "@/lib/student-assessment";
-import { findMatchingRoadmapSteps } from "@/lib/student-skill-gap";
+import { findMatchingRoadmapSteps } from "@/lib/roadmap-matching";
+
 import type { RoadmapPhase } from "@/lib/ai/schemas";
 
 type AssessmentResultProps = {
