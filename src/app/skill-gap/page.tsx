@@ -219,9 +219,8 @@ export default async function SkillGapPage() {
           </section>
 
           {/* Historical Skill Progress View */}
-          {gap.progressHistory && gap.progressHistory.length > 0 && (
-            <SkillProgressView history={gap.progressHistory} />
-          )}
+          <SkillProgressView history={gap.progressHistory ?? []} />
+
 
           {/* SECTION 2: INDUSTRY SKILL GAP BREAKDOWN */}
           <section className="surface mt-6 p-5 sm:p-6">
