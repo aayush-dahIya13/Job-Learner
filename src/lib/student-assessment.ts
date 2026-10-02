@@ -552,6 +552,16 @@ export async function getMilestoneAssessmentsForUser(userId: number, jobRoleId: 
   });
 }
 
+export type SkillProgressHistoryAttempt = {
+  attemptId: number;
+  assessmentTitle: string;
+  assessmentType: string;
+  percentage: number;
+  demonstratedLevel: number;
+  levelLabel: DemonstratedLevelLabel;
+  completedAt: Date | string;
+};
+
 export type SkillProgressHistory = {
   skillId: number;
   skillName: string;
@@ -562,15 +572,98 @@ export type SkillProgressHistory = {
   latestDemonstratedLevel: number | null;
   latestLevelLabel: DemonstratedLevelLabel | null;
   improvementPercentage: number | null;
-  attempts: {
+  attempts: SkillProgressHistoryAttempt[];
+};
+
+export function buildSkillProgressHistory(params: {
+  rawHistory: Array<{
+    skillId: number;
+    skillName: string;
     attemptId: number;
     assessmentTitle: string;
     assessmentType: string;
     percentage: number;
     demonstratedLevel: number;
     completedAt: Date | string;
-  }[];
-};
+  }>;
+  selfReportedMap?: Map<number, number>;
+}): SkillProgressHistory[] {
+  const { rawHistory, selfReportedMap = new Map() } = params;
+
+  const map = new Map<
+    number,
+    {
+      skillId: number;
+      skillName: string;
+      attempts: SkillProgressHistoryAttempt[];
+    }
+  >();
+
+  for (const row of rawHistory) {
+    const existing = map.get(row.skillId) ?? {
+      skillId: row.skillId,
+      skillName: row.skillName,
+      attempts: [],
+    };
+
+    const percentage = Number(row.percentage);
+    const demonstratedLevel = row.demonstratedLevel;
+    const levelLabel = getDemonstratedLevelLabel(percentage);
+
+    existing.attempts.push({
+      attemptId: row.attemptId,
+      assessmentTitle: row.assessmentTitle,
+      assessmentType: row.assessmentType,
+      percentage,
+      demonstratedLevel,
+      levelLabel,
+      completedAt: row.completedAt,
+    });
+
+    map.set(row.skillId, existing);
+  }
+
+  const result: SkillProgressHistory[] = [];
+
+  for (const [skillId, data] of map.entries()) {
+    // Sort attempts chronologically by completedAt ASC
+    const sortedAttempts = [...data.attempts].sort((a, b) => {
+      const timeA = new Date(a.completedAt).getTime();
+      const timeB = new Date(b.completedAt).getTime();
+      return timeA - timeB;
+    });
+
+    const selfReportedLevel = selfReportedMap.get(skillId) ?? null;
+    const diag = sortedAttempts.find((a) => a.assessmentType === "diagnostic") ?? sortedAttempts[0];
+    const latest = sortedAttempts[sortedAttempts.length - 1];
+
+    const diagnosticPercentage = diag ? diag.percentage : null;
+    const diagnosticLevel = diag ? diag.demonstratedLevel : null;
+    const latestPercentage = latest ? latest.percentage : null;
+    const latestDemonstratedLevel = latest ? latest.demonstratedLevel : null;
+    const latestLevelLabel = latestPercentage !== null ? getDemonstratedLevelLabel(latestPercentage) : null;
+
+    const improvementPercentage =
+      sortedAttempts.length > 1 && latestPercentage !== null && diagnosticPercentage !== null
+        ? latestPercentage - diagnosticPercentage
+        : null;
+
+    result.push({
+      skillId,
+      skillName: data.skillName,
+      selfReportedLevel,
+      diagnosticPercentage,
+      diagnosticLevel,
+      latestPercentage,
+      latestDemonstratedLevel,
+      latestLevelLabel,
+      improvementPercentage,
+      attempts: sortedAttempts,
+    });
+  }
+
+  return result;
+}
 
 export async function getSkillProgressHistory(userId: number): Promise<SkillProgressHistory[]> {
   const historyRes = await query<{
@@ -602,72 +695,20 @@ export async function getSkillProgressHistory(userId: number): Promise<SkillProg
   );
   const selfMap = new Map(selfRes.rows.map((s) => [s.skill_id, s.proficiency_level]));
 
-  const map = new Map<number, {
-    skillId: number;
-    skillName: string;
-    attempts: {
-      attemptId: number;
-      assessmentTitle: string;
-      assessmentType: string;
-      percentage: number;
-      demonstratedLevel: number;
-      completedAt: Date | string;
-    }[];
-  }>();
+  const rawHistory = historyRes.rows.map((row) => ({
+    skillId: row.skill_id,
+    skillName: row.skill_name,
+    attemptId: row.attempt_id,
+    assessmentTitle: row.assessment_title,
+    assessmentType: row.assessment_type,
+    percentage: Number(row.percentage),
+    demonstratedLevel: row.demonstrated_level,
+    completedAt: row.completed_at,
+  }));
 
-  for (const row of historyRes.rows) {
-    const existing = map.get(row.skill_id) ?? {
-      skillId: row.skill_id,
-      skillName: row.skill_name,
-      attempts: [],
-    };
-
-    existing.attempts.push({
-      attemptId: row.attempt_id,
-      assessmentTitle: row.assessment_title,
-      assessmentType: row.assessment_type,
-      percentage: Number(row.percentage),
-      demonstratedLevel: row.demonstrated_level,
-      completedAt: row.completed_at,
-    });
-
-    map.set(row.skill_id, existing);
-  }
-
-  const result: SkillProgressHistory[] = [];
-
-  for (const [skillId, data] of map.entries()) {
-    const selfReportedLevel = selfMap.get(skillId) ?? null;
-    const diag = data.attempts.find((a) => a.assessmentType === "diagnostic") ?? data.attempts[0];
-    const latest = data.attempts[data.attempts.length - 1];
-
-    const diagnosticPercentage = diag ? diag.percentage : null;
-    const diagnosticLevel = diag ? diag.demonstratedLevel : null;
-    const latestPercentage = latest ? latest.percentage : null;
-    const latestDemonstratedLevel = latest ? latest.demonstratedLevel : null;
-    const latestLevelLabel = latestPercentage !== null ? getDemonstratedLevelLabel(latestPercentage) : null;
-
-    const improvementPercentage =
-      latestPercentage !== null && diagnosticPercentage !== null
-        ? latestPercentage - diagnosticPercentage
-        : null;
-
-    result.push({
-      skillId,
-      skillName: data.skillName,
-      selfReportedLevel,
-      diagnosticPercentage,
-      diagnosticLevel,
-      latestPercentage,
-      latestDemonstratedLevel,
-      latestLevelLabel,
-      improvementPercentage,
-      attempts: data.attempts,
-    });
-  }
-
-  return result;
+  return buildSkillProgressHistory({ rawHistory, selfReportedMap: selfMap });
 }
+
 
 export type LatestCompletedAssessmentSkill = {
   skillId: number;
