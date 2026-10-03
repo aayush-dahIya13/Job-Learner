@@ -6,6 +6,7 @@ import {
   getCompletedRoadmapStepNumbers,
   resolveAdaptiveLearningRecommendation,
 } from "@/lib/student-skill-gap";
+import { checkSkillReassessmentEligibility } from "@/lib/reassessment";
 import { getLatestCompletedAssessment } from "@/lib/student-assessment";
 import { latestRoadmap } from "@/lib/ai/store";
 import { CareerGoalSelector } from "@/components/career-goal-selector";
@@ -191,6 +192,38 @@ export default async function SkillGapPage() {
                           </p>
                         )}
                       </div>
+
+                      {/* Reassessment Checkpoint Action if Learning Completed */}
+                      {(() => {
+                        const reassessment = checkSkillReassessmentEligibility({
+                          skillName: weak.skillName,
+                          completedStepNumbers,
+                          phases: roadmap?.phases,
+                        });
+
+                        if (!reassessment.isEligible) return null;
+
+                        return (
+                          <div className="pt-2">
+                            <div className="rounded-lg border border-emerald-300 bg-emerald-50/80 p-2.5 dark:border-emerald-900/60 dark:bg-emerald-950/30 flex items-center justify-between gap-3">
+                              <div className="space-y-0.5">
+                                <span className="text-[11px] font-extrabold uppercase text-emerald-800 dark:text-emerald-300 tracking-wider flex items-center gap-1">
+                                  <span>⚡</span> Learning Step Completed
+                                </span>
+                                <p className="text-xs text-stone-700 dark:text-stone-300 font-medium">
+                                  Step {reassessment.stepNumber} done! Check your progress.
+                                </p>
+                              </div>
+                              <Link
+                                href={reassessment.actionUrl}
+                                className="btn-primary px-3 py-1.5 text-xs shrink-0 font-bold shadow-xs"
+                              >
+                                Reassess Skill →
+                              </Link>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* Recommended Learning Action */}
                       <div className="pt-2.5 border-t border-stone-200/60 dark:border-stone-800 space-y-1.5">
