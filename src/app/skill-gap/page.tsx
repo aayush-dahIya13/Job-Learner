@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { requireUserId } from "@/lib/auth";
-import { getStudentSkillGap, findMatchingRoadmapSteps } from "@/lib/student-skill-gap";
+import {
+  getStudentSkillGap,
+  findMatchingRoadmapSteps,
+  getCompletedRoadmapStepNumbers,
+  resolveAdaptiveLearningRecommendation,
+} from "@/lib/student-skill-gap";
 import { getLatestCompletedAssessment } from "@/lib/student-assessment";
 import { latestRoadmap } from "@/lib/ai/store";
 import { CareerGoalSelector } from "@/components/career-goal-selector";
 import { StudentSkillsManager } from "@/components/student-skills-manager";
 import { SkillProgressView } from "@/components/skill-progress-view";
 import { AssessmentEvidenceCard } from "@/components/assessment-evidence-card";
+import { AdaptiveRecommendationCard } from "@/components/adaptive-recommendation-card";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { formatDate, formatDateShort } from "@/lib/date";
 
@@ -17,6 +23,16 @@ export default async function SkillGapPage() {
     getLatestCompletedAssessment(id),
     latestRoadmap(id),
   ]);
+
+  const completedStepNumbers = roadmap
+    ? await getCompletedRoadmapStepNumbers(id, roadmap.id)
+    : [];
+
+  const recommendation = resolveAdaptiveLearningRecommendation({
+    weakSkills: gap?.assessmentWeakSkills ?? [],
+    phases: roadmap?.phases,
+    completedStepNumbers,
+  });
 
 
   return (
@@ -74,6 +90,9 @@ export default async function SkillGapPage() {
 
           {/* Assessment Evidence Section */}
           <AssessmentEvidenceCard assessment={latestAssessment} />
+
+          {/* Adaptive Recommendation Section */}
+          <AdaptiveRecommendationCard recommendation={recommendation} />
 
 
           {/* SECTION 1: ASSESSMENT-DRIVEN SKILL GAP */}
