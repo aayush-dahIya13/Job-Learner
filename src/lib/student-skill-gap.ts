@@ -14,7 +14,22 @@ export type AssessmentWeakSkill = {
   completedAt: Date | string;
 };
 
-export { findMatchingRoadmapSteps, type MatchedRoadmapStep } from "@/lib/roadmap-matching";
+export {
+  findMatchingRoadmapSteps,
+  resolveAdaptiveLearningRecommendation,
+  type MatchedRoadmapStep,
+  type AdaptiveRecommendationResult,
+  type AdaptiveRecommendationStatus,
+} from "@/lib/roadmap-matching";
+
+export async function getCompletedRoadmapStepNumbers(userId: number, roadmapId: number): Promise<number[]> {
+  const result = await query<{ step_number: number }>(
+    `SELECT step_number FROM student_roadmap_progress WHERE user_id = $1 AND roadmap_id = $2 ORDER BY step_number ASC`,
+    [userId, roadmapId]
+  );
+  return result.rows.map((row) => row.step_number);
+}
+
 
 
 
