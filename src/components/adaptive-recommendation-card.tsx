@@ -68,14 +68,24 @@ export function AdaptiveRecommendationCard({ recommendation }: AdaptiveRecommend
           </Link>
         )}
 
-        {status === "ALL_COMPLETED" && recommendedStep && (
-          <Link
-            href={`/roadmap#step-${recommendedStep.stepNumber}`}
-            className="btn-secondary px-4 py-2 text-xs shrink-0 inline-flex items-center gap-1"
-          >
-            <span>Review Step {recommendedStep.stepNumber}</span>
-            <span>→</span>
-          </Link>
+        {status === "ALL_COMPLETED" && (
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Link
+              href="/assessments"
+              className="btn-primary px-4 py-2 text-xs shrink-0 inline-flex items-center gap-1.5 font-bold"
+            >
+              <span>Reassess Skill</span>
+              <span>→</span>
+            </Link>
+            {recommendedStep && (
+              <Link
+                href={`/roadmap#step-${recommendedStep.stepNumber}`}
+                className="btn-secondary px-3 py-2 text-xs shrink-0 inline-flex items-center gap-1"
+              >
+                <span>Review Step {recommendedStep.stepNumber}</span>
+              </Link>
+            )}
+          </div>
         )}
       </div>
     </section>

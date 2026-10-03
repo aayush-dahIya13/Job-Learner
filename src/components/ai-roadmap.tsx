@@ -555,6 +555,35 @@ function StepCard({
         )}
       </div>
 
+      {/* Reassessment Action / Neutral State when Step is Completed */}
+      {isCompleted && step.skills && step.skills.length > 0 && (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/30 flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
+              <span>🎯</span> Reassessment Checkpoint
+            </span>
+            <p className="text-xs text-stone-700 dark:text-stone-300 font-medium">
+              Learning step completed! Re-test your technical proficiency.
+            </p>
+          </div>
+          <Link
+            href="/assessments"
+            className="btn-primary px-3.5 py-1.5 text-xs shrink-0 font-bold inline-flex items-center gap-1 shadow-xs"
+          >
+            <span>Reassess Skill</span>
+            <span>→</span>
+          </Link>
+        </div>
+      )}
+
+      {isCompleted && (!step.skills || step.skills.length === 0) && (
+        <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50/60 p-3 dark:border-stone-800 dark:bg-stone-900/30">
+          <p className="text-xs text-stone-500 dark:text-stone-400 italic">
+            No linked assessment for this step.
+          </p>
+        </div>
+      )}
+
       {/* Why This Step Callout */}
       <div className="mt-4 rounded-xl border border-[var(--jl-border)] bg-[var(--jl-canvas-soft)] p-3.5 sm:p-4">
         <p className="text-xs font-extrabold uppercase tracking-wider text-[var(--jl-primary)]">
