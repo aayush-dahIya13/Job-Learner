@@ -270,8 +270,12 @@ export default async function SkillGapPage() {
             )}
           </section>
 
-          {/* Historical Skill Progress View */}
-          <SkillProgressView history={gap.progressHistory ?? []} />
+          {/* Historical Skill Progress View: Skill Improvement Journey */}
+          <SkillProgressView
+            history={gap.progressHistory ?? []}
+            roadmapPhases={roadmap?.phases}
+            completedStepNumbers={completedStepNumbers}
+          />
 
 
           {/* SECTION 2: INDUSTRY SKILL GAP BREAKDOWN */}
