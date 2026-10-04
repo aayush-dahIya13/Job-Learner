@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { YourLearningStatus } from "@/components/your-learning-status";
+import type { StudentLearningStatus } from "@/lib/student-dashboard-status";
 
 type SkillGap = {
   jobRole: { title: string };
@@ -23,6 +25,7 @@ type DashboardOverviewProps = {
   };
   skillGap: SkillGap;
   curriculum: Curriculum;
+  learningStatus?: StudentLearningStatus;
 };
 
 const journey = [
@@ -43,7 +46,7 @@ const quickActions = [
   ["Learning roadmap", "Plan your next steps", "/roadmap", "↗"],
 ] as const;
 
-export function DashboardOverview({ student, skillGap, curriculum }: DashboardOverviewProps) {
+export function DashboardOverview({ student, skillGap, curriculum, learningStatus }: DashboardOverviewProps) {
   const firstName = student.fullName.split(" ")[0];
   const gaps = skillGap?.skills.filter((skill) => skill.status !== "mastered").slice(0, 3) ?? [];
 
@@ -59,6 +62,9 @@ export function DashboardOverview({ student, skillGap, curriculum }: DashboardOv
         </div>
       </div>
     </section>
+
+    {/* Primary "Your Learning Status" Adaptive Command Center */}
+    {learningStatus && <YourLearningStatus status={learningStatus} />}
 
     <section className="grid gap-5 xl:grid-cols-[1.25fr_.75fr]">
       <article className="dashboard-card p-5 sm:p-6">
