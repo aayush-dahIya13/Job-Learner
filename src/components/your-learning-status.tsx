@@ -61,7 +61,14 @@ export function YourLearningStatus({ status }: YourLearningStatusProps) {
                   Readiness Score
                 </span>
               </div>
-              <div className="h-3 overflow-hidden rounded-full bg-white/80 dark:bg-stone-800 border border-stone-200/60 dark:border-stone-700">
+              <div
+                className="h-3 overflow-hidden rounded-full bg-white/80 dark:bg-stone-800 border border-stone-200/60 dark:border-stone-700"
+                role="progressbar"
+                aria-valuenow={readinessScore}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Career readiness score: ${readinessScore}%`}
+              >
                 <div
                   className="h-full rounded-full bg-moss transition-all duration-500"
                   style={{ width: `${readinessScore}%` }}
@@ -81,7 +88,7 @@ export function YourLearningStatus({ status }: YourLearningStatusProps) {
             className="inline-flex items-center gap-1 text-xs font-bold text-brand hover:underline pt-1"
           >
             <span>View Full Skill Gap Analysis</span>
-            <span>→</span>
+            <span aria-hidden="true">→</span>
           </Link>
         </article>
 
@@ -126,7 +133,7 @@ export function YourLearningStatus({ status }: YourLearningStatusProps) {
                 {recommendation.weakSkill.skillName}
               </h4>
               <p className="text-xs text-emerald-800 dark:text-emerald-300 font-medium">
-                ✅ All mapped learning steps completed for this weak skill. Take a reassessment checkpoint to re-verify your demonstrated score!
+                ✅ All mapped learning steps completed. Take a reassessment checkpoint to re-verify your demonstrated score!
               </p>
             </div>
           ) : (
@@ -135,7 +142,7 @@ export function YourLearningStatus({ status }: YourLearningStatusProps) {
                 No recommendation yet
               </h4>
               <p className="text-xs text-stone-600 dark:text-stone-400">
-                Complete an assessment or generate your roadmap to receive a personalized learning recommendation tailored to your skill gap.
+                Complete an assessment or generate your roadmap to receive a personalized learning recommendation.
               </p>
             </div>
           )}
@@ -147,14 +154,15 @@ export function YourLearningStatus({ status }: YourLearningStatusProps) {
                 className="btn-primary px-5 py-2.5 text-xs font-bold inline-flex items-center gap-1.5 shadow-xs"
               >
                 <span>Continue Learning (Step {recommendation.recommendedStep.stepNumber})</span>
-                <span>→</span>
+                <span aria-hidden="true">→</span>
               </Link>
             ) : recommendation.status === "ALL_COMPLETED" ? (
               <Link
                 href="/assessments"
                 className="btn-primary px-5 py-2.5 text-xs font-bold inline-flex items-center gap-1.5 shadow-xs"
               >
-                <span>Reassess Skill →</span>
+                <span>Reassess Skill</span>
+                <span aria-hidden="true">→</span>
               </Link>
             ) : (
               <Link
@@ -209,6 +217,7 @@ export function YourLearningStatus({ status }: YourLearningStatusProps) {
                   <Link
                     href="/skill-gap"
                     className="btn-secondary px-2.5 py-1 text-xs shrink-0 font-semibold"
+                    aria-label={`View skill gap details for ${skill.skillName}`}
                   >
                     Details →
                   </Link>
@@ -221,7 +230,7 @@ export function YourLearningStatus({ status }: YourLearningStatusProps) {
                 <span>🎉</span> You're currently on track.
               </p>
               <p className="text-xs text-emerald-800 dark:text-emerald-300">
-                No assessed skills currently require attention below the proficiency threshold!
+                No assessed skills currently require attention below the proficiency threshold.
               </p>
             </div>
           )}
@@ -272,8 +281,11 @@ export function YourLearningStatus({ status }: YourLearningStatusProps) {
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-stone-300 dark:border-stone-700 p-4 text-center">
-              <p className="text-xs text-stone-500 dark:text-stone-400">
-                No improvement trends yet. Take your first assessment to establish a baseline.
+              <p className="text-xs font-semibold text-stone-700 dark:text-stone-300">
+                No improvement trends yet.
+              </p>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                Complete your first assessment to start measuring demonstrated skills.
               </p>
             </div>
           )}
@@ -329,10 +341,10 @@ export function YourLearningStatus({ status }: YourLearningStatusProps) {
           ) : (
             <div className="rounded-xl border border-dashed border-stone-300 dark:border-stone-700 p-6 text-center space-y-3">
               <p className="text-sm font-bold text-stone-800 dark:text-stone-200">
-                No assessment completed yet.
+                No assessment history yet
               </p>
               <p className="text-xs text-stone-600 dark:text-stone-400 max-w-md mx-auto">
-                Take your first diagnostic assessment to establish your demonstrated skill baseline.
+                Complete your first assessment to start measuring demonstrated skills.
               </p>
               <Link
                 href="/assessments"
