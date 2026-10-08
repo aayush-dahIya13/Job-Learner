@@ -316,7 +316,7 @@ export async function getVerifiedSkillProfile(userId: number): Promise<VerifiedS
     skillsToStrengthen,
     curriculumContext: curriculumRes && curriculumRes.curriculum
       ? {
-          curriculumName: curriculumRes.curriculum.curriculumName,
+          curriculumName: curriculumRes.curriculum.name,
           regulationVersion: curriculumRes.curriculum.regulationVersion,
         }
       : null,
