@@ -461,18 +461,18 @@ function VerifiedSkillCard({
       )}
 
       {/* Reassessment Checkpoint Banner */}
-      {skill.reassessment.eligible && (
+      {skill.reassessment.isEligible && (
         <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 p-3 rounded-xl flex items-center justify-between gap-3 text-xs">
           <div className="space-y-0.5">
             <span className="font-bold text-emerald-900 dark:text-emerald-300 block">
               Reassessment Checkpoint Ready!
             </span>
             <p className="text-emerald-800 dark:text-emerald-400 text-[11px]">
-              You completed learning step "{skill.reassessment.roadmapStepTitle}". Verify your progress now!
+              {skill.reassessment.helperText || "You completed learning for this skill. Verify your progress now!"}
             </p>
           </div>
           <Link
-            href="/assessments"
+            href={skill.reassessment.actionUrl || "/assessments"}
             className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition"
           >
             Reassess Skill →
@@ -573,7 +573,7 @@ function WeakSkillCard({ weak }: { weak: WeakSkillWithRoadmapStep }) {
         <div>
           <h4 className="font-bold text-stone-900 dark:text-stone-100 text-sm">{weak.skillName}</h4>
           <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
-            Score: {weak.score}% (Demonstrated Level {weak.demonstratedLevel} vs Required Level {weak.requiredLevel})
+            Score: {weak.score}% (Demonstrated Level {weak.level} - {weak.label})
           </span>
         </div>
         <span className="text-[10px] font-bold uppercase tracking-wider rounded bg-amber-100 text-amber-800 px-2 py-0.5 dark:bg-amber-950/80 dark:text-amber-300">
@@ -590,7 +590,7 @@ function WeakSkillCard({ weak }: { weak: WeakSkillWithRoadmapStep }) {
             {weak.matchingSteps.map((step) => (
               <div key={step.stepNumber} className="flex items-center justify-between gap-2 bg-white/80 dark:bg-stone-900/80 p-2 rounded-lg border border-amber-200/50 dark:border-amber-900/30">
                 <span className="font-medium text-stone-900 dark:text-stone-100 truncate">
-                  Step {step.stepNumber}: {step.stepTitle}
+                  Step {step.stepNumber}: {step.title}
                 </span>
                 <Link
                   href="/roadmap"
