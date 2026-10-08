@@ -3,10 +3,14 @@ import {
   percentageToDemonstratedLevel,
   getDemonstratedLevelLabel,
   resolveCurrentDemonstratedSkill,
-  resolveEffectiveSkillState,
   type DemonstratedLevelLabel,
 } from "@/lib/proficiency";
-
+import { getStudentSkillGap, getCompletedRoadmapStepNumbers, type AssessmentWeakSkill } from "@/lib/student-skill-gap";
+import { getStudentProfileDetails } from "@/lib/student-profile";
+import { getStudentCurriculum } from "@/lib/student-curriculum";
+import { latestRoadmap } from "@/lib/ai/store";
+import { findMatchingRoadmapSteps, type MatchedRoadmapStep } from "@/lib/roadmap-matching";
+import { checkSkillReassessmentEligibility, type ReassessmentInfo } from "@/lib/reassessment";
 
 export type VerifiedSkillEvidence = {
   attemptId: number;
@@ -20,7 +24,7 @@ export type VerifiedSkillEvidence = {
   completedAt: Date | string;
 };
 
-export type VerificationStatus = "UNVERIFIED" | "BELOW_REQUIREMENT" | "MEETS_REQUIREMENT";
+export type VerificationStatus = "VERIFIED" | "DEVELOPING" | "NEEDS_IMPROVEMENT" | "UNVERIFIED";
 
 export type VerifiedSkillItem = {
   skillId: number;
@@ -40,53 +44,52 @@ export type VerifiedSkillItem = {
   evidenceCount: number;
   evidenceHistory: VerifiedSkillEvidence[];
   lastAssessedAt: Date | string | null;
+  reassessment: ReassessmentInfo;
+  isCurriculumSupported: boolean;
+};
+
+export type StudentDeclaredSkill = {
+  skillId: number;
+  skillName: string;
+  category: string | null;
+  proficiencyLevel: number; // Self-reported 1-5
+};
+
+export type WeakSkillWithRoadmapStep = AssessmentWeakSkill & {
+  matchingSteps: MatchedRoadmapStep[];
 };
 
 export type VerifiedSkillProfile = {
-  studentId: number;
+  student: {
+    userId: number;
+    fullName: string;
+    email: string;
+    contactNumber: string;
+    collegeName: string;
+    branchName: string;
+    currentYear: number;
+    careerGoalVision: string;
+  };
   targetJobRole: { id: number; title: string } | null;
-  overallAlignmentScore: number;
-  totalSkills: number;
+  readinessScore: number | null;
+  totalAssessmentsCount: number;
+  totalSkillsCount: number;
   verifiedSkillsCount: number;
-  unverifiedSkillsCount: number;
-  meetsRequirementCount: number;
-  belowRequirementCount: number;
-  skills: VerifiedSkillItem[];
+  unverifiedDeclaredSkillsCount: number;
+  verificationCoveragePercentage: number;
+  verifiedSkills: VerifiedSkillItem[];
+  declaredSkills: StudentDeclaredSkill[];
+  skillsToStrengthen: WeakSkillWithRoadmapStep[];
+  curriculumContext?: {
+    curriculumName: string;
+    regulationVersion: string;
+  } | null;
 };
 
 export async function getVerifiedSkillProfile(userId: number): Promise<VerifiedSkillProfile> {
-  // 1. Fetch student's target career role
-  const goalRes = await query<{ id: number; title: string }>(
-    `SELECT jr.id::integer AS id, jr.title 
-     FROM student_career_goals scg 
-     JOIN job_roles jr ON jr.id = scg.job_role_id 
-     WHERE scg.user_id = $1`,
-    [userId]
-  );
-  const targetJobRole = goalRes.rows[0] ? { id: goalRes.rows[0].id, title: goalRes.rows[0].title } : null;
-
-  // 2. Parallel queries for: Required skills (if job role set), Self-reported skills, and Assessment attempt results
-  const [requiredRes, selfReportedRes, historyRes] = await Promise.all([
-    targetJobRole
-      ? query<{ skill_id: number; skill_name: string; category: string | null; required_level: number; importance: number }>(
-          `SELECT jrs.skill_id::integer AS skill_id, s.name AS skill_name, s.category, jrs.required_level, jrs.importance
-           FROM job_role_skills jrs
-           JOIN skills s ON s.id = jrs.skill_id
-           WHERE jrs.job_role_id = $1
-           ORDER BY jrs.importance DESC, s.name`,
-          [targetJobRole.id]
-        )
-      : Promise.resolve({ rows: [] }),
-
-    query<{ skill_id: number; skill_name: string; category: string | null; proficiency_level: number }>(
-      `SELECT ss.skill_id::integer AS skill_id, s.name AS skill_name, s.category, ss.proficiency_level
-       FROM student_skills ss
-       JOIN skills s ON s.id = ss.skill_id
-       WHERE ss.user_id = $1
-       ORDER BY s.name`,
-      [userId]
-    ),
-
+  const [profileDetails, gap, historyRes, roadmap, curriculumRes] = await Promise.all([
+    getStudentProfileDetails(userId),
+    getStudentSkillGap(userId),
     query<{
       skill_id: number;
       skill_name: string;
@@ -113,54 +116,23 @@ export async function getVerifiedSkillProfile(userId: number): Promise<VerifiedS
        ORDER BY sar.skill_id, aa.completed_at ASC`,
       [userId]
     ),
+    latestRoadmap(userId),
+    getStudentCurriculum(userId).catch(() => null),
   ]);
 
-  // Map to hold aggregated skill info by skill_id
-  type SkillMeta = {
-    skillId: number;
-    skillName: string;
-    category: string | null;
-    selfReportedLevel: number | null;
-    requiredLevel: number | null;
-    importance: number | null;
-  };
+  const completedStepNumbers = roadmap
+    ? await getCompletedRoadmapStepNumbers(userId, roadmap.id)
+    : [];
 
-  const skillMap = new Map<number, SkillMeta>();
+  const totalAssessmentsRes = await query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM assessment_attempts WHERE user_id = $1 AND status = 'completed'`,
+    [userId]
+  );
+  const totalAssessmentsCount = Number(totalAssessmentsRes.rows[0]?.count ?? "0");
 
-  // Helper to ensure skill entry exists
-  function ensureSkill(id: number, name: string, category: string | null): SkillMeta {
-    let entry = skillMap.get(id);
-    if (!entry) {
-      entry = {
-        skillId: id,
-        skillName: name,
-        category,
-        selfReportedLevel: null,
-        requiredLevel: null,
-        importance: null,
-      };
-      skillMap.set(id, entry);
-    }
-    return entry;
-  }
-
-  // Populate required skills
-  for (const row of requiredRes.rows) {
-    const item = ensureSkill(row.skill_id, row.skill_name, row.category);
-    item.requiredLevel = row.required_level;
-    item.importance = row.importance;
-  }
-
-  // Populate self-reported skills
-  for (const row of selfReportedRes.rows) {
-    const item = ensureSkill(row.skill_id, row.skill_name, row.category);
-    item.selfReportedLevel = row.proficiency_level;
-  }
-
-  // Group attempts by skill_id
+  // Group assessment attempts by skill_id
   const attemptsMap = new Map<number, VerifiedSkillEvidence[]>();
   for (const row of historyRes.rows) {
-    ensureSkill(row.skill_id, row.skill_name, row.category);
     const list = attemptsMap.get(row.skill_id) ?? [];
     const pct = Number(row.percentage);
     list.push({
@@ -177,110 +149,176 @@ export async function getVerifiedSkillProfile(userId: number): Promise<VerifiedS
     attemptsMap.set(row.skill_id, list);
   }
 
-  const skillItems: VerifiedSkillItem[] = [];
-  let verifiedSkillsCount = 0;
-  let unverifiedSkillsCount = 0;
-  let meetsRequirementCount = 0;
-  let belowRequirementCount = 0;
+  // Required skills map from job role
+  const requiredSkillsMap = new Map<number, { requiredLevel: number; importance: number }>();
+  if (gap && gap.jobRole) {
+    const jrsRes = await query<{ skill_id: number; required_level: number; importance: number }>(
+      `SELECT skill_id::integer AS skill_id, required_level, importance FROM job_role_skills WHERE job_role_id = $1`,
+      [gap.jobRole.id]
+    );
+    for (const r of jrsRes.rows) {
+      requiredSkillsMap.set(r.skill_id, { requiredLevel: r.required_level, importance: r.importance });
+    }
+  }
 
-  let weightedAchievement = 0;
-  let totalImportance = 0;
+  // Build list of verified skills vs declared skills
+  const verifiedSkills: VerifiedSkillItem[] = [];
+  const declaredSkills: StudentDeclaredSkill[] = [];
 
-  for (const [skillId, meta] of skillMap.entries()) {
-    const attempts = attemptsMap.get(skillId) ?? [];
+  for (const studentSkill of profileDetails.skills) {
+    const attempts = attemptsMap.get(studentSkill.skillId) ?? [];
     const evidenceCount = attempts.length;
 
-    // Diagnostic assessment: pick first attempt of type 'diagnostic' or first attempt overall if none tagged diagnostic
-    const diagAttempt = attempts.find((a) => a.assessmentType === "diagnostic") ?? (attempts.length > 0 ? attempts[0] : null);
-    
-    // Use centralized evidence strategy for latest demonstrated skill
-    const latestAttempt = resolveCurrentDemonstratedSkill(attempts);
+    if (evidenceCount === 0) {
+      // Declared skill with no assessment evidence
+      declaredSkills.push({
+        skillId: studentSkill.skillId,
+        skillName: studentSkill.skillName,
+        category: studentSkill.category ?? null,
+        proficiencyLevel: studentSkill.proficiencyLevel,
+      });
+      continue;
+    }
+
+    const diagAttempt = attempts.find((a) => a.assessmentType === "diagnostic") ?? attempts[0];
+    const latestAttempt = resolveCurrentDemonstratedSkill(attempts)!;
 
     const diagnosticScore = diagAttempt ? diagAttempt.percentage : null;
     const diagnosticLevel = diagAttempt ? diagAttempt.demonstratedLevel : null;
     const diagnosticLabel = diagAttempt ? diagAttempt.levelLabel : null;
 
-    const latestDemonstratedScore = latestAttempt ? latestAttempt.percentage : null;
-    const demonstratedLevel = latestAttempt ? latestAttempt.demonstratedLevel : null;
-    const demonstratedLabel = latestAttempt ? latestAttempt.levelLabel : null;
-
+    const latestDemonstratedScore = latestAttempt.percentage;
+    const demonstratedLevel = latestAttempt.demonstratedLevel;
+    const demonstratedLabel = latestAttempt.levelLabel;
 
     const improvementPercentage =
-      latestDemonstratedScore !== null && diagnosticScore !== null
+      latestDemonstratedScore !== null && diagnosticScore !== null && attempts.length > 1
         ? latestDemonstratedScore - diagnosticScore
         : null;
 
-    // Status Determination strictly adheres to 3 values: UNVERIFIED, BELOW_REQUIREMENT, MEETS_REQUIREMENT
+    const reqMeta = requiredSkillsMap.get(studentSkill.skillId);
+
+    // Status based strictly on centralized proficiency
     let status: VerificationStatus;
-    if (evidenceCount === 0 || demonstratedLevel === null) {
-      status = "UNVERIFIED";
-      unverifiedSkillsCount++;
-    } else if (meta.requiredLevel !== null) {
-      if (demonstratedLevel >= meta.requiredLevel) {
-        status = "MEETS_REQUIREMENT";
-        meetsRequirementCount++;
-        verifiedSkillsCount++;
-      } else {
-        status = "BELOW_REQUIREMENT";
-        belowRequirementCount++;
-        verifiedSkillsCount++;
-      }
+    if (demonstratedLevel >= 3) {
+      status = "VERIFIED";
+    } else if (demonstratedLevel === 2) {
+      status = "DEVELOPING";
     } else {
-      // Assessed skill with no specific career requirement
-      status = "MEETS_REQUIREMENT";
-      meetsRequirementCount++;
-      verifiedSkillsCount++;
+      status = "NEEDS_IMPROVEMENT";
     }
 
-    // Alignment calculation for skills required by career goal
-    if (meta.requiredLevel !== null && meta.importance !== null) {
-      totalImportance += meta.importance;
-      if (demonstratedLevel !== null) {
-        weightedAchievement += Math.min(demonstratedLevel / meta.requiredLevel, 1) * meta.importance;
-      }
-    }
+    const reassessment = checkSkillReassessmentEligibility({
+      skillName: studentSkill.skillName,
+      completedStepNumbers,
+      phases: roadmap?.phases,
+    });
 
-    skillItems.push({
-      skillId: meta.skillId,
-      skillName: meta.skillName,
-      category: meta.category,
-      selfReportedLevel: meta.selfReportedLevel,
+    verifiedSkills.push({
+      skillId: studentSkill.skillId,
+      skillName: studentSkill.skillName,
+      category: studentSkill.category ?? null,
+      selfReportedLevel: studentSkill.proficiencyLevel,
       diagnosticScore,
       diagnosticLevel,
       diagnosticLabel,
       latestDemonstratedScore,
       demonstratedLevel,
       demonstratedLabel,
-      requiredLevel: meta.requiredLevel,
-      importance: meta.importance,
+      requiredLevel: reqMeta?.requiredLevel ?? null,
+      importance: reqMeta?.importance ?? null,
       improvementPercentage,
       status,
       evidenceCount,
       evidenceHistory: attempts,
-      lastAssessedAt: latestAttempt ? latestAttempt.completedAt : null,
+      lastAssessedAt: latestAttempt.completedAt,
+      reassessment,
+      isCurriculumSupported: Boolean(curriculumRes && curriculumRes.curriculum),
     });
   }
 
-  // Sort skills: required skills first (by importance desc), then by name
-  skillItems.sort((a, b) => {
-    if (a.importance !== null && b.importance !== null) {
-      if (b.importance !== a.importance) return b.importance - a.importance;
-    } else if (a.importance !== null) return -1;
-    else if (b.importance !== null) return 1;
-    return a.skillName.localeCompare(b.skillName);
-  });
+  // Also include assessed skills that student hasn't explicitly added to student_skills
+  for (const [skillId, attempts] of attemptsMap.entries()) {
+    if (profileDetails.skills.some((s) => s.skillId === skillId)) continue;
+    if (attempts.length === 0) continue;
 
-  const overallAlignmentScore = totalImportance > 0 ? Math.round((weightedAchievement / totalImportance) * 100) : 0;
+    const latestAttempt = resolveCurrentDemonstratedSkill(attempts)!;
+    const diagAttempt = attempts.find((a) => a.assessmentType === "diagnostic") ?? attempts[0];
+    const reqMeta = requiredSkillsMap.get(skillId);
+
+    const reassessment = checkSkillReassessmentEligibility({
+      skillName: latestAttempt.assessmentTitle,
+      completedStepNumbers,
+      phases: roadmap?.phases,
+    });
+
+    const demonstratedLevel = latestAttempt.demonstratedLevel;
+    let status: VerificationStatus;
+    if (demonstratedLevel >= 3) status = "VERIFIED";
+    else if (demonstratedLevel === 2) status = "DEVELOPING";
+    else status = "NEEDS_IMPROVEMENT";
+
+    verifiedSkills.push({
+      skillId,
+      skillName: attempts[0].assessmentTitle.replace(" Diagnostic", "").replace(" Checkpoint", ""),
+      category: null,
+      selfReportedLevel: null,
+      diagnosticScore: diagAttempt ? diagAttempt.percentage : null,
+      diagnosticLevel: diagAttempt ? diagAttempt.demonstratedLevel : null,
+      diagnosticLabel: diagAttempt ? diagAttempt.levelLabel : null,
+      latestDemonstratedScore: latestAttempt.percentage,
+      demonstratedLevel,
+      demonstratedLabel: latestAttempt.levelLabel,
+      requiredLevel: reqMeta?.requiredLevel ?? null,
+      importance: reqMeta?.importance ?? null,
+      improvementPercentage: attempts.length > 1 ? latestAttempt.percentage - diagAttempt.percentage : null,
+      status,
+      evidenceCount: attempts.length,
+      evidenceHistory: attempts,
+      lastAssessedAt: latestAttempt.completedAt,
+      reassessment,
+      isCurriculumSupported: Boolean(curriculumRes && curriculumRes.curriculum),
+    });
+  }
+
+  // Skills to strengthen (Weak Skills from Skill Gap)
+  const skillsToStrengthen: WeakSkillWithRoadmapStep[] = (gap?.assessmentWeakSkills ?? []).map((weak) => ({
+    ...weak,
+    matchingSteps: findMatchingRoadmapSteps(weak.skillName, roadmap?.phases),
+  }));
+
+  const totalSkillsCount = verifiedSkills.length + declaredSkills.length;
+  const verifiedSkillsCount = verifiedSkills.length;
+  const unverifiedDeclaredSkillsCount = declaredSkills.length;
+  const verificationCoveragePercentage =
+    totalSkillsCount > 0 ? Math.round((verifiedSkillsCount / totalSkillsCount) * 100) : 0;
 
   return {
-    studentId: userId,
-    targetJobRole,
-    overallAlignmentScore,
-    totalSkills: skillItems.length,
+    student: {
+      userId,
+      fullName: profileDetails.fullName,
+      email: profileDetails.email,
+      contactNumber: profileDetails.contactNumber,
+      collegeName: profileDetails.collegeName,
+      branchName: profileDetails.branchName,
+      currentYear: profileDetails.currentYear,
+      careerGoalVision: profileDetails.careerGoal,
+    },
+    targetJobRole: profileDetails.targetRole,
+    readinessScore: gap?.readinessScore ?? null,
+    totalAssessmentsCount,
+    totalSkillsCount,
     verifiedSkillsCount,
-    unverifiedSkillsCount,
-    meetsRequirementCount,
-    belowRequirementCount,
-    skills: skillItems,
+    unverifiedDeclaredSkillsCount,
+    verificationCoveragePercentage,
+    verifiedSkills,
+    declaredSkills,
+    skillsToStrengthen,
+    curriculumContext: curriculumRes && curriculumRes.curriculum
+      ? {
+          curriculumName: curriculumRes.curriculum.curriculumName,
+          regulationVersion: curriculumRes.curriculum.regulationVersion,
+        }
+      : null,
   };
 }
